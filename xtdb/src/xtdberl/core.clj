@@ -54,8 +54,9 @@
   (println "Q, from: " from-pid ", id: " query-id ", q: " query ", args: " args)
   (try
     (let [query (term/unwrap-tuples query)
+          _ (def *q query)
           result (apply xt/q (xt/db xtdb) query args)]
-      (def *q query)
+
       (send! mbox from-pid 'ok query-id result))
     (catch Exception e
       (log/warn e "Error in query")
