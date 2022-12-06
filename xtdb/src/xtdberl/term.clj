@@ -4,7 +4,7 @@
             OtpErlangList OtpErlangTuple OtpErlangBinary OtpErlangAtom OtpErlangBoolean OtpErlangByte
             OtpErlangChar OtpErlangDouble OtpErlangFloat OtpErlangLong OtpErlangInt OtpErlangUInt
             OtpErlangShort OtpErlangUShort OtpErlangString OtpErlangObject OtpErlangPid OtpErlangPort
-            OtpErlangRef))
+            OtpErlangRef OtpErlangMap))
   (:require [clojure.walk :as walk]))
 
 (set! *warn-on-reflection* true)
@@ -60,7 +60,14 @@
 
   OtpErlangLong
   (->clj [x]
-    (.longValue x)))
+    (.longValue x))
+
+
+  OtpErlangMap
+  (->clj [x]
+    (zipmap (map ->clj (.keys x))
+            (map ->clj (.values x))))
+  )
 
 (declare ->erl)
 
@@ -85,12 +92,14 @@
 
   java.util.Map
   (->erl [x]
-    ;; Output maps as orddicts, eg [{key1, "value}, ...]
-    (OtpErlangList.
-     (otp-array-raw
-      (for [key-val x]
-        (OtpErlangTuple. (otp-array key-val))))))
+    (let [entries (seq x)]
+      (OtpErlangMap. (otp-array (map key entries))
+                     (otp-array (map val entries)))))
 
+  java.util.Date
+  (->erl [x]
+    (OtpErlangTuple. (otp-array-raw [(OtpErlangAtom. "timestamp")
+                                     (OtpErlangLong. (.getTime x))])))
   java.util.List
   (->erl [x]
     (OtpErlangList. (otp-array x)))

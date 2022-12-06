@@ -63,10 +63,31 @@
       (println "Q err" e "; ex-data => " (ex-data e))
       (send! mbox from-pid 'error query-id (ex-data e)))))
 
+(defmethod handle 'put [xtdb mbox [_ from-pid msg-id & docs]]
+  (def *docs docs)
+  (try
+    (let [{::xt/keys [tx-id tx-time]}
+          (xt/submit-tx xtdb
+                        (for [d (term/unwrap-tuples docs)]
+                          [::xt/put (if (map? d)
+                                      ;; Use map directly
+                                      d
+                                      ;; Turn orddict into a map
+                                      (into {} d))]))]
+      (send! mbox from-pid
+             'ok msg-id (term/tuple tx-id tx-time)))
+    (catch Exception e
+      (println "PUT err ", e "; ex-data => " (ex-data e))
+      (send! mbox from-pid 'error msg-id (ex-data e)))))
+
 (defn server
   "Main server loop, reads commands and dispatches them to executor pool."
   [xtdb ^OtpMbox mbox ^ExecutorService executor-service]
-  (letfn [(recv [] (->clj (.receive mbox)))]
+  (letfn [(recv []
+            (try
+              (->clj (.receive mbox))
+              (catch Throwable t
+                (println "ERROR converting received to clj data: " t))))]
     (loop [msg (recv)]
       (println "Received " msg)
       (def *msg msg)
@@ -83,3 +104,8 @@
 
 (defonce xtdb-server
   (delay (.start (Thread. #(server @xtdb @inbox @executor-service)))))
+
+(comment
+  (xt/submit-tx @xtdb [[::xt/put {:xt/id "hep1" :name "hep" :jotain 42 :ok? true}]
+                       [::xt/put {:xt/id "hep2" :name "hep" :jotain 666 :ok? false :muuta :tietoja}]])
+  (xt/submit-tx @xtdb [[::xt/put {:xt/id "hep3" :name "heppa" :jotain 4211 :ok? true}]]))

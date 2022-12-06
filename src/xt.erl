@@ -1,5 +1,6 @@
 -module(xt).
--export([q/3, q/2, demo/0]).
+-export([q/3, q/2, put/1, demo/0]).
+-include("types.hrl").
 %% Convenient interface to XTDB process
 
 %% FIXME: configure where the xtdb is located
@@ -20,9 +21,22 @@ q(Find, Where, In) ->
         {ok, QueryId, Results} -> {ok, Results};
         {error, QueryId, ErrorInfo} -> throw(ErrorInfo);
         Msg -> io:format("Received something else: ~p~n", [Msg]), Msg
-    after 5000 ->
+    after 30000 -> %% configure as options
             timeout
+    end.
 
+-spec put(doclike()) -> {ok, #txinfo{}} | {error, any()}.
+
+
+put(Doc) ->
+    MsgId = make_ref(),
+    pid() ! {put, self(), MsgId, Doc},
+    receive
+        {ok, MsgId, TxInfo} ->
+            {ok, TxInfo};
+        {error, MsgId, Error} ->
+            {error, Error}
+    after 5000 -> timeout
     end.
 
 demo() ->
