@@ -50,8 +50,8 @@
     (def *out msg)
     (.send mbox to msg)))
 
-(defmethod handle 'q [xtdb mbox [_ from-pid query-id query & args]]
-  (println "Q, from: " from-pid ", id: " query-id ", q: " query ", args: " args)
+(defmethod handle 'q [xtdb mbox [_ from-pid query-id query args]]
+  (println "Q, from: " from-pid ", id: " query-id ", q: " query ", args: " (pr-str args))
   (try
     (let [query (term/unwrap-tuples query)
           _ (def *q query)
