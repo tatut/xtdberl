@@ -1,0 +1,2 @@
+-type field_mapping() :: {atom(), integer()} | {atom(), fun(), fun()}.
+-type mappings() :: [field_mapping()].
