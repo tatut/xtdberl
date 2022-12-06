@@ -53,7 +53,8 @@
 (defmethod handle 'q [xtdb mbox [_ from-pid query-id query args]]
   (println "Q, from: " from-pid ", id: " query-id ", q: " query ", args: " (pr-str args))
   (try
-    (let [query (term/unwrap-tuples query)
+    (let [;; Convert tuples to lists (for operation calls)
+          query (term/unwrap-tuples query #(apply list %))
           _ (def *q query)
           result (apply xt/q (xt/db xtdb) query args)]
 
@@ -77,7 +78,7 @@
       (send! mbox from-pid
              'ok msg-id (term/tuple tx-id tx-time)))
     (catch Exception e
-      (println "PUT err ", e "; ex-data => " (ex-data e))
+      (log/warn e "Error in PUT")
       (send! mbox from-pid 'error msg-id (ex-data e)))))
 
 (defn server
