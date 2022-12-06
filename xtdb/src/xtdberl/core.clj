@@ -50,15 +50,17 @@
     (def *out msg)
     (.send mbox to msg)))
 
-(defmethod handle :q [xtdb mbox [_ from-pid query-id query args]]
+(defmethod handle 'q [xtdb mbox [_ from-pid query-id query & args]]
   (println "Q, from: " from-pid ", id: " query-id ", q: " query ", args: " args)
   (try
-    (let [result (apply xt/q (xt/db xtdb) query args)]
-      (send! mbox from-pid :ok query-id result)
-      ))
-
-  (send! mbox from-pid
-         query-id "response-to" args))
+    (let [query (term/unwrap-tuples query)
+          result (apply xt/q (xt/db xtdb) query args)]
+      (def *q query)
+      (send! mbox from-pid 'ok query-id result))
+    (catch Exception e
+      (log/warn e "Error in query")
+      (println "Q err" e "; ex-data => " (ex-data e))
+      (send! mbox from-pid 'error query-id (ex-data e)))))
 
 (defn server
   "Main server loop, reads commands and dispatches them to executor pool."

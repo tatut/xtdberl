@@ -4,7 +4,8 @@
             OtpErlangList OtpErlangTuple OtpErlangBinary OtpErlangAtom OtpErlangBoolean OtpErlangByte
             OtpErlangChar OtpErlangDouble OtpErlangFloat OtpErlangLong OtpErlangInt OtpErlangUInt
             OtpErlangShort OtpErlangUShort OtpErlangString OtpErlangObject OtpErlangPid OtpErlangPort
-            OtpErlangRef)))
+            OtpErlangRef))
+  (:require [clojure.walk :as walk]))
 
 (set! *warn-on-reflection* true)
 
@@ -30,11 +31,14 @@
         "true" true
         "false" false
         "undefined" nil
-        (keyword s))))
+
+        (if (= (.charAt s 0) \:)
+          (keyword (subs s 1))
+          (symbol s)))))
 
   OtpErlangList
   (->clj [x]
-    (map ->clj (iterator-seq (.iterator x))))
+    (mapv ->clj (iterator-seq (.iterator x))))
 
   OtpErlangTuple
   (->clj [x]
@@ -48,12 +52,23 @@
 
   OtpErlangString
   (->clj [x]
-    (.stringValue x)))
+    (.stringValue x))
+
+  OtpErlangDouble
+  (->clj [x]
+    (.doubleValue x))
+
+  OtpErlangLong
+  (->clj [x]
+    (.longValue x)))
 
 (declare ->erl)
 
 (defn ^"[Lcom.ericsson.otp.erlang.OtpErlangObject;" otp-array [things]
   (into-array OtpErlangObject (map ->erl things)))
+
+(defn ^"[Lcom.ericsson.otp.erlang.OtpErlangObject;" otp-array-raw [things]
+  (into-array OtpErlangObject things))
 
 (extend-protocol ToErlang
   Boolean
@@ -62,15 +77,40 @@
 
   clojure.lang.Keyword
   (->erl [x]
+    (OtpErlangAtom. (str x)))
+
+  clojure.lang.Symbol
+  (->erl [x]
     (OtpErlangAtom. (name x)))
+
+  java.util.Map
+  (->erl [x]
+    ;; Output maps as orddicts, eg [{key1, "value}, ...]
+    (OtpErlangList.
+     (otp-array-raw
+      (for [key-val x]
+        (OtpErlangTuple. (otp-array key-val))))))
 
   java.util.List
   (->erl [x]
     (OtpErlangList. (otp-array x)))
 
+  java.util.Set
+  (->erl [x]
+    ;; Output sets as just lists
+    (OtpErlangList. (otp-array x)))
+
   String
   (->erl [x]
     (OtpErlangString. x))
+
+  Long
+  (->erl [x]
+    (OtpErlangLong. x))
+
+  Double
+  (->erl [x]
+    (OtpErlangDouble. x))
 
   Tuple
   (->erl [x]
@@ -84,3 +124,14 @@
 
   nil
   (->erl [_] (OtpErlangAtom. "undefined")))
+
+(defn unwrap-tuples
+  "Deeply unwrap tuple elements to something else, defaults to vector."
+  ([form] (unwrap-tuples form vec))
+  ([form with]
+   (walk/postwalk
+    (fn [x]
+      (if (tuple? x)
+        (with (:elements x))
+        x))
+    form)))
