@@ -1,6 +1,8 @@
 {:paths ["src"]
  :deps {;; Provide your own built jinterface lib, for now
         com.ericsson.otp/otp-erlang {:local/root "otp_src_25.1.2/lib/jinterface/priv/OtpErlang.jar"}
+ :deps {org.clojure/clojure {:mvn/version "1.11.1"}
+        org.clojure/tools.logging {:mvn/version "1.2.4"}
 
         com.xtdb/xtdb-core {:mvn/version "1.22.1"}}
  :aliases {:dev {}

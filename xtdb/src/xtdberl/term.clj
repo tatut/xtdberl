@@ -16,6 +16,12 @@
 
 (defrecord Tuple [elements])
 
+(defn tuple? [x]
+  (instance? Tuple x))
+
+(defn tuple [& items]
+  (->Tuple (vec items)))
+
 (extend-protocol ToClojure
   OtpErlangAtom
   (->clj [x]
@@ -23,6 +29,7 @@
       (case s
         "true" true
         "false" false
+        "undefined" nil
         (keyword s))))
 
   OtpErlangList
@@ -31,8 +38,22 @@
 
   OtpErlangTuple
   (->clj [x]
-    (->Tuple (mapv ->clj (.elements x)))))
+    (->Tuple (mapv ->clj (.elements x))))
 
+  OtpErlangPid
+  (->clj [x] x)
+
+  OtpErlangRef
+  (->clj [x] x)
+
+  OtpErlangString
+  (->clj [x]
+    (.stringValue x)))
+
+(declare ->erl)
+
+(defn ^"[Lcom.ericsson.otp.erlang.OtpErlangObject;" otp-array [things]
+  (into-array OtpErlangObject (map ->erl things)))
 
 (extend-protocol ToErlang
   Boolean
@@ -45,9 +66,21 @@
 
   java.util.List
   (->erl [x]
-    (OtpErlangList. (into-array OtpErlangObject
-                                (map ->erl x))))
+    (OtpErlangList. (otp-array x)))
+
+  String
+  (->erl [x]
+    (OtpErlangString. x))
 
   Tuple
   (->erl [x]
-    (OtpErlangTuple. (into-array OtpErlangObject (map ->erl (:elements x))))))
+    (OtpErlangTuple. (otp-array (:elements x))))
+
+  OtpErlangPid
+  (->erl [x] x)
+
+  OtpErlangRef
+  (->erl [x] x)
+
+  nil
+  (->erl [_] (OtpErlangAtom. "undefined")))
