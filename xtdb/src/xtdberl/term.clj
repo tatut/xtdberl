@@ -4,7 +4,7 @@
             OtpErlangList OtpErlangTuple OtpErlangBinary OtpErlangAtom OtpErlangBoolean OtpErlangByte
             OtpErlangChar OtpErlangDouble OtpErlangFloat OtpErlangLong OtpErlangInt OtpErlangUInt
             OtpErlangShort OtpErlangUShort OtpErlangString OtpErlangObject OtpErlangPid OtpErlangPort
-            OtpErlangRef OtpErlangMap))
+            OtpErlangRef OtpErlangMap OtpErlangBinary))
   (:require [clojure.walk :as walk]))
 
 (set! *warn-on-reflection* true)
@@ -153,6 +153,15 @@
                                      (OtpErlangLong. (.getHour x))
                                      (OtpErlangLong. (.getMinute x))
                                      (OtpErlangLong. (.getSecond x))])))
+
+  java.util.UUID
+  (->erl [x]
+    (let [bb (java.nio.ByteBuffer/wrap (byte-array 16))]
+      (.putLong bb (.getMostSignificantBits x))
+      (.putLong bb (.getLeastSignificantBits x))
+      (OtpErlangTuple. (otp-array-raw [(OtpErlangAtom. "uuid")
+                                       (OtpErlangBinary. (.array bb))]))))
+
   nil
   (->erl [_] (OtpErlangAtom. "undefined")))
 
@@ -182,3 +191,10 @@
 (defmethod parse-tuple (->erl 'timestamp)
   [[_ ^OtpErlangLong ts]]
   (java.util.Date. (.longValue ts)))
+
+(defmethod parse-tuple (->erl 'uuid)
+  [[_ ^OtpErlangBinary bin]]
+  (let [bb (java.nio.ByteBuffer/wrap (.binaryValue bin))
+        most (.getLong bb)
+        least (.getLong bb)]
+    (java.util.UUID. most least)))
