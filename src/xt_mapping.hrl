@@ -1,3 +1,7 @@
 -record(mapping, {empty :: tuple(),
                   fields :: [field_mapping()]}).
--type field_mapping() :: {atom(), integer()} | {atom(), fun(), fun()}.
+-record(field, {attr :: atom(),
+                field :: integer(),
+                to_xtdb :: function(),
+                from_xtdb :: function()
+               }).

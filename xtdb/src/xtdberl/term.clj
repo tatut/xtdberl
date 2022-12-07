@@ -23,6 +23,10 @@
 (defn tuple [& items]
   (->Tuple (vec items)))
 
+(defmulti parse-tuple (fn [elements] (first elements)))
+(defmethod parse-tuple :default [elements]
+  (->Tuple (mapv ->clj elements)))
+
 (extend-protocol ToClojure
   OtpErlangAtom
   (->clj [x]
@@ -42,7 +46,7 @@
 
   OtpErlangTuple
   (->clj [x]
-    (->Tuple (mapv ->clj (.elements x))))
+    (parse-tuple (seq (.elements x))))
 
   OtpErlangPid
   (->clj [x] x)
@@ -62,12 +66,10 @@
   (->clj [x]
     (.longValue x))
 
-
   OtpErlangMap
   (->clj [x]
     (zipmap (map ->clj (.keys x))
-            (map ->clj (.values x))))
-  )
+            (map ->clj (.values x)))))
 
 (declare ->erl)
 
@@ -131,6 +133,22 @@
   OtpErlangRef
   (->erl [x] x)
 
+  java.time.LocalDate
+  (->erl [x]
+    (OtpErlangTuple. (otp-array-raw [(OtpErlangAtom. "local_date")
+                                     (OtpErlangLong. (.getYear x))
+                                     (OtpErlangLong. (.getValue (.getMonth x)))
+                                     (OtpErlangLong. (.getDayOfMonth x))])))
+
+  java.time.LocalDateTime
+  (->erl [x]
+    (OtpErlangTuple. (otp-array-raw [(OtpErlangAtom. "local_datetime")
+                                     (OtpErlangLong. (.getYear x))
+                                     (OtpErlangLong. (.getValue (.getMonth x)))
+                                     (OtpErlangLong. (.getDayOfMonth x))
+                                     (OtpErlangLong. (.getHour x))
+                                     (OtpErlangLong. (.getMinute x))
+                                     (OtpErlangLong. (.getSecond x))])))
   nil
   (->erl [_] (OtpErlangAtom. "undefined")))
 
@@ -144,3 +162,15 @@
         (with (:elements x))
         x))
     form)))
+
+(defmethod parse-tuple (->erl 'local_date)
+  [[_ ^OtpErlangLong year ^OtpErlangLong month ^OtpErlangLong date]]
+  (java.time.LocalDate/of (.intValue year) (.intValue month) (.intValue date)))
+
+(defmethod parse-tuple (->erl 'local_datetime)
+  [[_
+    ^OtpErlangLong year ^OtpErlangLong month ^OtpErlangLong date
+    ^OtpErlangLong hour ^OtpErlangLong minute ^OtpErlangLong sec]]
+  (java.time.LocalDateTime/of
+   (.intValue year) (.intValue month) (.intValue date)
+   (.intValue hour) (.intValue minute) (.intValue sec)))

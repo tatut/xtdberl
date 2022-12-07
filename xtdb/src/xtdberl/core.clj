@@ -19,7 +19,7 @@
 ;; Now just defining things with defaults to get started quickly
 ;;
 
-(defonce xtdb (delay (xt/start-node {})))
+(defonce xtdb (delay (xt/start-node {:xtdb.lucene/lucene-store {}})))
 
 (defonce inbox
   (delay

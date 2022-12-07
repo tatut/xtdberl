@@ -34,6 +34,42 @@ idmap(Field, Key) ->
              maps:put(':xt/id', #{ Key => element(Field, Rec) }, Doc)
      end}.
 
+%% @doc Normal field mapping without any special conversion
+field(Attr, Field) -> #field{attr = Attr, field = Field}.
+
+%% @doc Field with special mapping to and from XTDB values.
+%% ToXTDB is called to convert the fields value when sending to XTDB and
+%% FromXTDB is called before setting values received form XTDB to a record.
+field(Attr, Field, ToXTDB, FromXTDB) ->
+    #field{attr = Attr, field = Field,
+           to_xtdb = ToXTDB,
+           from_xtdb = FromXTDB}.
+
+%% @doc Create a field that is stored as a local date
+local_date(Attr, Field) ->
+    #field{attr = Attr, field = Field,
+           to_xtdb = fun(undefined) -> undefined;
+                        ({Year,Month,Day} -> {local_date, Year, Month, Day})
+                        end,
+           from_xtdb = fun(undefined) -> undefined;
+                          ({local_date, Year, Month, Day}) -> {Year, Month, Day}
+                       end}.
+
+%% @doc Create a field that is stored as a date and time
+local_datetime(Attr,Field) ->
+    #field{attr = Attr, field = Field,
+           to_xtdb = fun(undefined) -> undefined;
+                        ({{Year,Month,Day},{Hour,Minute,Second}}) -> {local_datetime, Year,Month,Day,Hour,Minute,Second}
+                     end,
+           from_xtdb = fun(undefined) -> undefined;
+                          ({local_datetime, Y, M, D, H, Mi, S})  ->
+                                  {{Y,M,D}, {H,Mi,S}}
+                       end}.
+
+
+
+
+
 %% @doc Create a record mapping
 mapping(EmptyRecordValue, FieldMappings) ->
     #mapping{empty = EmptyRecordValue,

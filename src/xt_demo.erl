@@ -6,7 +6,8 @@
 -record(person, {person_id :: string(),
                  first_name :: string(),
                  last_name :: string(),
-                 email :: string()}).
+                 email :: string(),
+                 date_of_birth :: calendar:date()}).
 
 person_mapping() ->
     xt_mapping:mapping(
@@ -16,8 +17,11 @@ person_mapping() ->
        {':person/last-name', #person.last_name},
        {':person/email', #person.email}]).
 
-person(Id,Fn,Ln,Email) ->
-    #person{person_id = Id, first_name = Fn, last_name = Ln, email = Email}.
+person(Id,Fn,Ln,Email,Dob) ->
+    #person{person_id = Id,
+            first_name = Fn, last_name = Ln,
+            email = Email,
+            date_of_birth = Dob}.
 
 put(Person) ->
     xt:put(xt_mapping:to_doc(Person, person_mapping())).
@@ -27,7 +31,10 @@ qlike(Person) ->
 
 
 add_persons() ->
-    put(person("01234-abc", "Max", "Feedpressure", "max@example.com")),
-    put(person("42069-xxx", "Foo", "Barsky", "foobar@example.com")),
-    put(person("666100-333", "Nathaniel", "Backpressure", "nate@example.com")),
-    put(person("590823-as1", "Eric", "Lang", "er.lang@erlang.org")).
+    put(("01234-abc", "Max", "Feedpressure", "max@example.com", {1981, 4, 8})),
+    put(person("42069-xxx", "Foo", "Barsky", "foobar@example.com", {1970, 1, 1})),
+    put(person("666100-333", "Nathaniel", "Backpressure", "nate@example.com", {1995,3,6})),
+    put(person("123123-333", "Eric", "Lang", "er.lang@erlang.org", {1977, 7, 7})),
+    put(person("234234-444", "Matti", "Korhonen", "matti@notreallyexisting.org", {1969, 12, 20})),
+    put(person("345345-555", "John", "Doe", "jd@imaginaryjd.com", {2000, 3, 4})),
+    put(person("456456-666", "Annika", "Andersson", "aa@existerar-inte.se", {1986, 5, 27})).
