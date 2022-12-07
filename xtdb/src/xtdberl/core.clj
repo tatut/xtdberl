@@ -107,6 +107,11 @@
   (delay (.start (Thread. #(server @xtdb @inbox @executor-service)))))
 
 (comment
+  (xt/submit-tx @xtdb [[::xt/put {:xt/id {:person "555444222"}
+                                  :person/first-name "Snöwmän"
+                                  :person/last-name "Unicode ☃"
+                                  :person/email "snowman.unicode@example.com"
+                                  :person/date-of-birth (java.time.LocalDate/of 1900 1 1)}]])
   (xt/submit-tx @xtdb [[::xt/put {:xt/id "hep1" :name "hep" :jotain 42 :ok? true}]
                        [::xt/put {:xt/id "hep2" :name "hep" :jotain 666 :ok? false :muuta :tietoja}]])
   (xt/submit-tx @xtdb [[::xt/put {:xt/id "hep3" :name "heppa" :jotain 4211 :ok? true}]]))
