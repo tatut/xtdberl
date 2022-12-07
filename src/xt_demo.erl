@@ -17,8 +17,8 @@ person_mapping() ->
        xt_mapping:field(':person/last-name', #person.last_name),
        xt_mapping:field(':person/email', #person.email),
        xt_mapping:local_date(':person/date-of-birth', #person.date_of_birth)]).
-
 person(Id,Fn,Ln,Email,Dob) ->
+
     #person{person_id = Id,
             first_name = Fn, last_name = Ln,
             email = Email,

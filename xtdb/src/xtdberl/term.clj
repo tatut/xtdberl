@@ -92,6 +92,10 @@
   (->erl [x]
     (OtpErlangAtom. (name x)))
 
+  java.lang.Integer
+  (->erl [x]
+    (OtpErlangInt. x))
+
   java.util.Map
   (->erl [x]
     (let [entries (seq x)]

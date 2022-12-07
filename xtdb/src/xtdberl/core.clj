@@ -29,16 +29,6 @@
 (defonce executor-service
   (delay (Executors/newFixedThreadPool 20)))
 
-;;(def node (OtpNode. "heppa@localhost"))
-;;(def mbox (.createMbox node "xtdb"))
-
-;;(.send mbox "foo@localhost" (OtpErlangAtom. "joopajoo"))
-
-;;(.ping node "foo@localhost" 1000)
-;;(def pid (.receive mbox))
-
-;;(.send mbox pid (OtpErlangAtom. "sulle_takas"))
-
 (defmulti handle
   "Handle a message. Message is a vector of tuple elements and dispatch on the
   first element."
@@ -46,12 +36,10 @@
 
 (defn send! [^OtpMbox mbox ^OtpErlangPid to & tuple-elements]
   (let [^OtpErlangObject msg (->erl (apply term/tuple tuple-elements))]
-    (println "Sending " to ", msg: " msg)
     (def *out msg)
     (.send mbox to msg)))
 
 (defmethod handle 'q [xtdb mbox [_ from-pid query-id query args]]
-  (println "Q, from: " from-pid ", id: " query-id ", q: " query ", args: " (pr-str args))
   (try
     (let [;; Convert tuples to lists (for operation calls)
           query (term/unwrap-tuples query #(apply list %))
@@ -61,7 +49,6 @@
       (send! mbox from-pid 'ok query-id result))
     (catch Exception e
       (log/warn e "Error in query")
-      (println "Q err" e "; ex-data => " (ex-data e))
       (send! mbox from-pid 'error query-id (ex-data e)))))
 
 (defmethod handle 'put [xtdb mbox [_ from-pid msg-id & docs]]
@@ -80,6 +67,9 @@
     (catch Exception e
       (log/warn e "Error in PUT")
       (send! mbox from-pid 'error msg-id (ex-data e)))))
+
+(defmethod handle 'status [xtdb mbox [_ from-pid msg-id]]
+  (send! mbox from-pid 'ok msg-id (xt/status xtdb)))
 
 (defn server
   "Main server loop, reads commands and dispatches them to executor pool."

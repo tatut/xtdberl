@@ -1,5 +1,5 @@
 -module(xt).
--export([q/3, q/2, put/1, demo/0]).
+-export([q/3, q/2, put/1, status/0, demo/0]).
 -include("types.hrl").
 %% Convenient interface to XTDB process
 
@@ -38,6 +38,16 @@ put(Doc) ->
             {error, Error}
     after 5000 -> timeout
     end.
+
+status() ->
+    MsgId = make_ref(),
+    pid() ! {status, self(), MsgId},
+    receive
+        {ok, MsgId, Status} ->
+            {ok, Status}
+    after 5000 -> timeout
+    end.
+
 
 demo() ->
     Result = q([x,jotain], %% :find clause
