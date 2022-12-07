@@ -13,9 +13,10 @@ person_mapping() ->
     xt_mapping:mapping(
       #person{},
       [xt_mapping:idmap(#person.person_id, ':person'),
-       {':person/first-name', #person.first_name},
-       {':person/last-name', #person.last_name},
-       {':person/email', #person.email}]).
+       xt_mapping:field(':person/first-name', #person.first_name),
+       xt_mapping:field(':person/last-name', #person.last_name),
+       xt_mapping:field(':person/email', #person.email),
+       xt_mapping:local_date(':person/date-of-birth', #person.date_of_birth)]).
 
 person(Id,Fn,Ln,Email,Dob) ->
     #person{person_id = Id,
@@ -31,7 +32,7 @@ qlike(Person) ->
 
 
 add_persons() ->
-    put(("01234-abc", "Max", "Feedpressure", "max@example.com", {1981, 4, 8})),
+    put(person("01234-abc", "Max", "Feedpressure", "max@example.com", {1981, 4, 8})),
     put(person("42069-xxx", "Foo", "Barsky", "foobar@example.com", {1970, 1, 1})),
     put(person("666100-333", "Nathaniel", "Backpressure", "nate@example.com", {1995,3,6})),
     put(person("123123-333", "Eric", "Lang", "er.lang@erlang.org", {1977, 7, 7})),

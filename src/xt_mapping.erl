@@ -1,38 +1,45 @@
 %% @doc Mapping from records to XTDB documents
 -module(xt_mapping).
--export([to_doc/2, to_rec/2, mapping/2, idmap/2, attributes/1, qlike/2]).
+-export([to_doc/2, to_rec/2,
+         mapping/2, idmap/2,
+         field/2, field/4, local_date/2, local_datetime/2,
+         attributes/1, qlike/2]).
 -include("xt_mapping.hrl").
+
+%% Maybe run value through conversion function
+conv(undefined, Val) -> Val;
+conv(Fun, Val) ->  Fun(Val).
 
 %% @doc Convert Erlang record tuple to an XTDB document map using mapping
 to_doc(Record, #mapping{fields = Fields}) ->
-    lists:foldl(fun({Name,Field}, Doc) -> maps:put(Name, element(Field, Record), Doc);
-                   ({_Name,_,Write}, Doc) -> Write(Record, Doc)
+    lists:foldl(fun(#field{attr=Name,field=Field,to_xtdb=Conv}, Doc) ->
+                        maps:put(Name, conv(Conv, element(Field, Record)), Doc);
+                   (#conversion{record_to_xtdb=Write}, Doc) -> Write(Record, Doc)
                 end,
                 #{}, Fields).
 
 %% @doc Convert an XTDB document map (as gotten by pull) to an Erlang record tuple using mapping
 to_rec(Doc, #mapping{empty = Empty, fields = Fields}) ->
-    lists:foldl(fun({Name,Field}, Rec) -> setelement(Field, Rec, maps:get(Name, Doc, undefined));
-                   ({_,Read,_}, Rec) -> Read(Doc,Rec)
+    lists:foldl(fun(#field{attr=Name,field=Field,from_xtdb=Conv}, Rec) ->
+                        setelement(Field, Rec, conv(Conv, maps:get(Name, Doc, undefined)));
+                   (#conversion{xtdb_to_record=Read}, Rec) -> Read(Doc,Rec)
                 end,
                 Empty, Fields).
 
 
 %% @doc Create an ':xt/id' mapping for a Field as Key.
 idmap(Field, Key) ->
-    {':xt/id',
-
-     %% Read function to set id field when creating record from doc
-     fun(Doc,Rec) ->
-             IdMap = maps:get(':xt/id', Doc),
-             Id = maps:get(Key, IdMap),
-             setelement(Field, Rec, Id)
-     end,
-
-     %% Write function to set doc :xt/id when creating doc from record
-     fun(Rec,Doc) ->
-             maps:put(':xt/id', #{ Key => element(Field, Rec) }, Doc)
-     end}.
+    #conversion{
+       %% Read function to set id field when creating record from doc
+       xtdb_to_record = fun(Doc,Rec) ->
+                                IdMap = maps:get(':xt/id', Doc),
+                                Id = maps:get(Key, IdMap),
+                                setelement(Field, Rec, Id)
+                        end,
+       %% Write function to set doc :xt/id when creating doc from record
+       record_to_xtdb = fun(Rec,Doc) ->
+                                maps:put(':xt/id', #{ Key => element(Field, Rec) }, Doc)
+                        end}.
 
 %% @doc Normal field mapping without any special conversion
 field(Attr, Field) -> #field{attr = Attr, field = Field}.
@@ -49,7 +56,7 @@ field(Attr, Field, ToXTDB, FromXTDB) ->
 local_date(Attr, Field) ->
     #field{attr = Attr, field = Field,
            to_xtdb = fun(undefined) -> undefined;
-                        ({Year,Month,Day} -> {local_date, Year, Month, Day})
+                        ({Year,Month,Day}) -> {local_date, Year, Month, Day}
                         end,
            from_xtdb = fun(undefined) -> undefined;
                           ({local_date, Year, Month, Day}) -> {Year, Month, Day}
@@ -103,14 +110,14 @@ qlike_textsearch(Attr, Term, {Where,In}) ->
     {Where ++ [[{'text-search', Attr, NextParam}, [[qlike]]]],
      [{NextParam, Term} | In]}.
 
-qlike_where(Attr, Val, WhereIn) ->
+qlike_where(Attr, Conv, Val, WhereIn) ->
     case Val of
-        {'<', Val1} -> qlike_op('<', Attr, Val1, WhereIn);
-        {'<=', Val1} -> qlike_op('<', Attr, Val1, WhereIn);
-        {'>', Val1} -> qlike_op('>', Attr, Val1, WhereIn);
-        {'>=', Val1} -> qlike_op('>=', Attr, Val1, WhereIn);
-        {'textsearch', Term} -> qlike_textsearch(Attr, Term, WhereIn);
-        _ -> qlike_eq(Attr, Val, WhereIn)
+        {'<', Val1} -> qlike_op('<', Attr, conv(Conv, Val1), WhereIn);
+        {'<=', Val1} -> qlike_op('<', Attr, conv(Conv,Val1), WhereIn);
+        {'>', Val1} -> qlike_op('>', Attr, conv(Conv, Val1), WhereIn);
+        {'>=', Val1} -> qlike_op('>=', Attr, conv(Conv, Val1), WhereIn);
+        {'textsearch', Term} -> qlike_textsearch(Attr, conv(Conv,Term), WhereIn);
+        _ -> qlike_eq(Attr, conv(Conv,Val), WhereIn)
     end.
 
 %% @doc Search instances by providing a candidate record. Record values may be
@@ -119,11 +126,11 @@ qlike_where(Attr, Val, WhereIn) ->
 %% - <, <=, >, >=  range predicate operators
 %% - textsearch    search using Lucene index
 qlike(Candidate, Mapping) ->
-    {Where,In} = lists:foldl(fun({Name,Field}, WhereIn) ->
+    {Where,In} = lists:foldl(fun(#field{attr=Name,field=Field,to_xtdb=Conv}, WhereIn) ->
                                      Val = element(Field, Candidate),
                                      case Val of
                                          undefined -> WhereIn;
-                                         _ -> qlike_where(Name, Val, WhereIn)
+                                         _ -> qlike_where(Name, Conv, Val, WhereIn)
                                      end;
                                 (_, WhereIn) -> WhereIn
                              end,
