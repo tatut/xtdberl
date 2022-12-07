@@ -178,3 +178,7 @@
   (java.time.LocalDateTime/of
    (.intValue year) (.intValue month) (.intValue date)
    (.intValue hour) (.intValue minute) (.intValue sec)))
+
+(defmethod parse-tuple (->erl 'timestamp)
+  [[_ ^OtpErlangLong ts]]
+  (java.util.Date. (.longValue ts)))
