@@ -1,35 +1,58 @@
 %% @doc Mapping from records to XTDB documents
 -module(xt_mapping).
 -export([to_doc/2, to_rec/2,
-         mapping/2, idmap/2,
+         mapping/2, idmap/2, embed/2, embed/3,
          field/2, field/4, local_date/2, local_datetime/2,
          attributes/1, qlike/2]).
 -include("xt_mapping.hrl").
 
 %% Maybe run value through conversion function
+-spec conv(undefined | function(), any()) -> any().
 conv(undefined, Val) -> Val;
 conv(Fun, Val) ->  Fun(Val).
 
 %% @doc Convert Erlang record tuple to an XTDB document map using mapping
+-spec to_doc(tuple(), #mapping{}) -> #{atom() => any()}.
 to_doc(Record, #mapping{fields = Fields}) ->
     lists:foldl(fun(#field{attr=Name,field=Field,to_xtdb=Conv}, Doc) ->
-                        maps:put(Name, conv(Conv, element(Field, Record)), Doc);
-                   (#conversion{record_to_xtdb=Write}, Doc) -> Write(Record, Doc)
+                        case conv(Conv, element(Field, Record)) of
+                            undefined -> Doc;
+                            Val -> maps:put(Name, Val, Doc)
+                        end;
+                   (#conversion{record_to_xtdb=Write}, Doc) -> Write(Record, Doc);
+                   (#embed{field=Field, mapping=EmbedMapping}, Doc) ->
+                        case element(Field, Record) of
+                            undefined -> Doc;
+                            E -> maps:merge(Doc, to_doc(E, EmbedMapping))
+                        end
                 end,
                 #{}, Fields).
 
 %% @doc Convert an XTDB document map (as gotten by pull) to an Erlang record tuple using mapping
+-spec to_rec(#{atom() => any()}, #mapping{}) -> tuple().
 to_rec(Doc, #mapping{empty = Empty, fields = Fields}) ->
     lists:foldl(fun(#field{attr=Name,field=Field,from_xtdb=Conv}, Rec) ->
                         setelement(Field, Rec, conv(Conv, maps:get(Name, Doc, undefined)));
-                   (#conversion{xtdb_to_record=Read}, Rec) -> Read(Doc,Rec)
+                   (#conversion{xtdb_to_record=Read}, Rec) -> Read(Doc,Rec);
+                   (#embed{field=Field, mapping=EmbedMapping}, Rec) ->
+                        case to_rec(Doc, EmbedMapping) of
+                            %% Embedded had no values (same as empty), don't set it
+                            None when None == EmbedMapping#mapping.empty -> Rec;
+
+                            %% Embedded had some values
+                            Val -> setelement(Field, Rec, Val)
+                        end
+
                 end,
                 Empty, Fields).
 
 
 %% @doc Create an ':xt/id' mapping for a Field as Key.
+-spec idmap(integer(), atom()) -> #conversion{}.
 idmap(Field, Key) ->
     #conversion{
+       attrs = [':xt/id'],
+
        %% Read function to set id field when creating record from doc
        xtdb_to_record = fun(Doc,Rec) ->
                                 IdMap = maps:get(':xt/id', Doc),
@@ -74,18 +97,44 @@ local_datetime(Attr,Field) ->
                        end}.
 
 
-
-
-
 %% @doc Create a record mapping
 mapping(EmptyRecordValue, FieldMappings) ->
     #mapping{empty = EmptyRecordValue,
              fields = FieldMappings}.
 
-%% @doc Return all XTDB attributes specified in the mapping. Uses an empty record instance.
-attributes(#mapping{empty=Empty} = M) ->
-    maps:keys(to_doc(Empty, M)).
+%% @doc Create a field mapping that embeds another records information in the same document.
+%% This is convenient to not need shredding the documents, simply use the same document for
+%% all attributes. You can optionally specify prefix to apply for the embedded fields (for
+%% example when embedding multiple records of the same type, like shipping and billing address).
+%%
+%% The prefix, if any, is applied to the start of the name, so if we have a record mapping for address
+%% that maps ':address/postal-code' and so on and we embed two records with shipping- and billing-
+%% prefixes, we will get ':shipping-address/postal-code' and ':billing-address/postal-code' attributes
+%% in the document.
+-spec embed(#mapping{}, integer()) -> #embed{}.
+-spec embed(atom(), #mapping{}, integer()) -> #embed{}.
+embed(Mapping, Field) -> #embed{mapping = Mapping, field = Field}.
+embed(Prefix, #mapping{fields=Fields}=Mapping, Field) ->
+    embed(Mapping#mapping{
+            fields =
+                [ prefix_name(Prefix,F) || F <- Fields ]}, Field).
 
+prefix_name(Prefix,#field{attr=Attr}=F) ->
+    PrefixStr = atom_to_list(Prefix),
+    PrefixedAttr = list_to_atom(
+                     ":" ++ PrefixStr ++
+                         string:sub_string(atom_to_list(Attr), 2)),
+    F#field{attr=PrefixedAttr};
+prefix_name(_,M) -> M.
+
+
+%% @doc Return all XTDB attributes specified in the mapping. Uses an empty record instance.
+attributes(#mapping{fields = Fields}) ->
+    lists:foldl(fun attributes/2, [],  Fields).
+
+attributes(#field{attr=A}, Acc) -> [A | Acc];
+attributes(#conversion{attrs=Attrs}, Acc) -> Attrs ++ Acc;
+attributes(#embed{mapping=M}, Acc) -> attributes(M) ++ Acc.
 
 next_param(In) ->
     list_to_atom( "p" ++ integer_to_list(length(In)) ).

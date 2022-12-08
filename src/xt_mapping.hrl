@@ -8,9 +8,11 @@
 
 %% @doc Defines a function to apply the whole doc or record
 %% when transferring between domains. This can use any fields to add
-%% fields.
+%% fields. Attrs field specifies what attributes should be pulled
+%% when fetching documents.
 -record(conversion, {record_to_xtdb :: function(),
-                     xtdb_to_record :: function()}).
+                     xtdb_to_record :: function(),
+                     attrs :: [atom()]}).
 
 %% @doc Defines the mapping from Erlang records to XTDB documents.
 %% The empty tuple value must be specified (eg #myrecord{}) for
@@ -19,3 +21,7 @@
                   fields :: [ mapping_def() ]}).
 
 -type mapping_def() :: #field{} | #conversion{}.
+
+%% @doc Embed mapping
+-record(embed, {field :: integer(),
+                mapping :: #mapping{}}).
