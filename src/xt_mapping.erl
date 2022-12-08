@@ -65,36 +65,41 @@ idmap(Field, Key) ->
                         end}.
 
 %% @doc Normal field mapping without any special conversion
-field(Attr, Field) -> #field{attr = Attr, field = Field}.
+field(Attr, Field) -> field(Attr, Field, undefined, undefined).
 
 %% @doc Field with special mapping to and from XTDB values.
 %% ToXTDB is called to convert the fields value when sending to XTDB and
 %% FromXTDB is called before setting values received form XTDB to a record.
 field(Attr, Field, ToXTDB, FromXTDB) ->
-    #field{attr = Attr, field = Field,
+    %% Check that attribute name starts with ':' (clj keywords)
+    AttrName = case atom_to_list(Attr) of
+                   [$: | _] -> Attr;
+                   Name -> list_to_atom([$: | Name])
+               end,
+    #field{attr = AttrName, field = Field,
            to_xtdb = ToXTDB,
            from_xtdb = FromXTDB}.
 
 %% @doc Create a field that is stored as a local date
 local_date(Attr, Field) ->
-    #field{attr = Attr, field = Field,
-           to_xtdb = fun(undefined) -> undefined;
-                        ({Year,Month,Day}) -> {local_date, Year, Month, Day}
-                        end,
-           from_xtdb = fun(undefined) -> undefined;
-                          ({local_date, Year, Month, Day}) -> {Year, Month, Day}
-                       end}.
+    field(Attr, Field,
+          fun(undefined) -> undefined;
+             ({Year,Month,Day}) -> {local_date, Year, Month, Day}
+          end,
+          fun(undefined) -> undefined;
+             ({local_date, Year, Month, Day}) -> {Year, Month, Day}
+          end).
 
 %% @doc Create a field that is stored as a date and time
 local_datetime(Attr,Field) ->
-    #field{attr = Attr, field = Field,
-           to_xtdb = fun(undefined) -> undefined;
-                        ({{Year,Month,Day},{Hour,Minute,Second}}) -> {local_datetime, Year,Month,Day,Hour,Minute,Second}
-                     end,
-           from_xtdb = fun(undefined) -> undefined;
-                          ({local_datetime, Y, M, D, H, Mi, S})  ->
-                                  {{Y,M,D}, {H,Mi,S}}
-                       end}.
+    field(Attr, Field,
+          fun(undefined) -> undefined;
+             ({{Year,Month,Day},{Hour,Minute,Second}}) -> {local_datetime, Year,Month,Day,Hour,Minute,Second}
+          end,
+          fun(undefined) -> undefined;
+             ({local_datetime, Y, M, D, H, Mi, S})  ->
+                  {{Y,M,D}, {H,Mi,S}}
+          end).
 
 
 %% @doc Create a record mapping
@@ -169,22 +174,31 @@ qlike_where(Attr, Conv, Val, WhereIn) ->
         _ -> qlike_eq(Attr, conv(Conv,Val), WhereIn)
     end.
 
+where_in(WhereIn0, Candidate, Mapping) ->
+    lists:foldl(
+      fun(#field{attr=Name,field=Field,to_xtdb=Conv}, WhereIn) ->
+              Val = element(Field, Candidate),
+              case Val of
+                  undefined -> WhereIn;
+                  _ -> qlike_where(Name, Conv, Val, WhereIn)
+              end;
+         (#embed{field=Field,mapping=EmbedMapping}, WhereIn) ->
+              case element(Field, Candidate) of
+                  undefined -> WhereIn;
+                  EmbedCandidate ->
+                      where_in(WhereIn, EmbedCandidate, EmbedMapping)
+              end;
+         (_, WhereIn) -> WhereIn
+      end,
+      WhereIn0, Mapping#mapping.fields).
+
 %% @doc Search instances by providing a candidate record. Record values may be
 %% direct values to match or tuples containing {op, Val} where op is one of
 %% the supported operations:
 %% - <, <=, >, >=  range predicate operators
 %% - textsearch    search using Lucene index
 qlike(Candidate, Mapping) ->
-    {Where,In} = lists:foldl(fun(#field{attr=Name,field=Field,to_xtdb=Conv}, WhereIn) ->
-                                     Val = element(Field, Candidate),
-                                     case Val of
-                                         undefined -> WhereIn;
-                                         _ -> qlike_where(Name, Conv, Val, WhereIn)
-                                     end;
-                                (_, WhereIn) -> WhereIn
-                             end,
-                             {[],[]},
-                             Mapping#mapping.fields),
+    {Where,In} = where_in({[],[]}, Candidate, Mapping),
     {ok, Results} = xt:q([[pull,qlike,attributes(Mapping)]],
                          Where, In),
     [to_rec(R, Mapping) || [R] <- Results].
