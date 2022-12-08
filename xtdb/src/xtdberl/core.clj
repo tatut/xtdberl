@@ -14,21 +14,6 @@
 
 (set! *warn-on-reflection* true)
 
-;; FIXME: proper startup with args
-;;
-;; Now just defining things with defaults to get started quickly
-;;
-
-(defonce xtdb (delay (xt/start-node {:xtdb.lucene/lucene-store {}})))
-
-(defonce inbox
-  (delay
-    (let [node (OtpNode. "xtdb@localhost")]
-      (.createMbox node "xtdb"))))
-
-(defonce executor-service
-  (delay (Executors/newFixedThreadPool 20)))
-
 (defmulti handle
   "Handle a message. Message is a vector of tuple elements and dispatch on the
   first element."
@@ -71,9 +56,10 @@
 (defmethod handle 'status [xtdb mbox [_ from-pid msg-id]]
   (send! mbox from-pid 'ok msg-id (xt/status xtdb)))
 
-(defn server
+(defn- server-loop
   "Main server loop, reads commands and dispatches them to executor pool."
   [xtdb ^OtpMbox mbox ^ExecutorService executor-service]
+  (log/info "xtdberl server mailbox started, mbox = " mbox)
   (letfn [(recv []
             (try
               (->clj (.receive mbox))
@@ -93,15 +79,58 @@
                               (log/warn t "Exception in message handler, msg: " msg))))
       (recur (recv)))))
 
-(defonce xtdb-server
-  (delay (.start (Thread. #(server @xtdb @inbox @executor-service)))))
+(defn- create-xtdb [xtdb]
+  (if (map? xtdb)
+    (xt/start-node xtdb)
+    xtdb))
 
-(comment
-  (xt/submit-tx @xtdb [[::xt/put {:xt/id {:person "555444222"}
-                                  :person/first-name "Snöwmän"
-                                  :person/last-name "Unicode ☃"
-                                  :person/email "snowman.unicode@example.com"
-                                  :person/date-of-birth (java.time.LocalDate/of 1900 1 1)}]])
-  (xt/submit-tx @xtdb [[::xt/put {:xt/id "hep1" :name "hep" :jotain 42 :ok? true}]
-                       [::xt/put {:xt/id "hep2" :name "hep" :jotain 666 :ok? false :muuta :tietoja}]])
-  (xt/submit-tx @xtdb [[::xt/put {:xt/id "hep3" :name "heppa" :jotain 4211 :ok? true}]]))
+(defn- create-mbox [{:keys [node mbox]}]
+  (let [node (OtpNode. node)]
+    (.createMbox node mbox)))
+
+(defn- create-xtdb-inspector [xtdb config]
+  (when config
+    ((requiring-resolve 'xtdb-inspector.core/start)
+     (merge {:xtdb-node xtdb}
+            config))))
+
+(defn- start-server [{:keys [xtdb ^OtpMbox mbox xtdb-inspector]
+                      {:keys [workers] :or {workers 20}} :server}]
+  (let [executor-service (Executors/newFixedThreadPool workers)
+        stop-xtdb-inspector (create-xtdb-inspector xtdb xtdb-inspector)]
+    (.start (Thread. #(server-loop xtdb mbox executor-service)))
+    ;; Return function to stop
+    (fn []
+      (try
+        (log/info "Stopping xtdberl")
+        (.exit mbox "stopping")
+        (when stop-xtdb-inspector
+          (stop-xtdb-inspector))
+        (catch Throwable t
+          (log/error t "Exception while trying to stop xtdberl"))))))
+
+(defn start
+  "Start XTDB service from configuration.
+  Returns a function to stop the server.
+
+  Configuration keys:
+
+  :xtdb    a map of XTDB configuration for starting a node or
+           a running XTDB instance to use
+  :mbox    the configuration to use for Erlang process communication
+           should be a map containing the following keys:
+           :node  node name to use
+           :mbox  name to use for registered process
+  :server  Contains other server configuration
+           :workers  how many worker threads to use (default: 20)
+
+  Optional keys:
+  :xtdb-inspector
+           If present, the XTDB inspector web UI is required and
+           started. Configuration map is passed to [[xtdb-inspector.core/start]].
+  "
+  [config]
+  (-> config
+      (update :xtdb create-xtdb)
+      (update :mbox create-mbox)
+      start-server))

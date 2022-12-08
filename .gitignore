@@ -21,3 +21,6 @@ xtdb/.clj-kondo
 xtdb/.cpcache
 xtdb/.nrepl-port
 /xtdb/.lsp/
+/xtdb/OtpErlang.jar
+/.lsp/
+/.clj-kondo/

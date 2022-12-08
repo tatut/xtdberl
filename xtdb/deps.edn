@@ -2,11 +2,13 @@
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}
         org.clojure/tools.logging {:mvn/version "1.2.4"}
         ;; Provide your own built jinterface lib, for now
-        com.ericsson.otp/otp-erlang {:local/root "/Users/tatu.tarvainen/Downloads/otp_src_25.1.2/lib/jinterface/priv/OtpErlang.jar"}
+        com.ericsson.otp/otp-erlang {:local/root "./OtpErlang.jar"}
 
         com.xtdb/xtdb-core {:mvn/version "1.22.1"}
         com.xtdb/xtdb-lucene {:mvn/version "1.22.1"}}
- :aliases {:dev {}
+ :aliases {:dev {:extra-deps
+                 {tatut/xtdb-inspector {:git/url "https://github.com/tatut/xtdb-inspector.git"
+                                        :sha "ca842fc40dda06c0321d258f23032dd277d3f8ca"}}}
            :rocksdb {:extra-deps {com.xtdb/xtdb-rocksdb {:mvn/version "1.22.1"}}}
            :lmdb {:extra-deps {com.xtdb/xtdb-lmdb {:mvn/version "1.22.1"}}}
            :s3 {:extra-deps {com.xtdb/xtdb-s3 {:mvn/version "1.22.1"}}}
