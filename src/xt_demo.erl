@@ -16,26 +16,27 @@
                  shipping_address :: #address{},
                  billing_address :: #address{}}).
 
-address_mapping() ->
-    xt_mapping:mapping(
-      #address{},
-      [xt_mapping:field(':address/street', #address.street),
-       xt_mapping:field(':address/city', #address.city),
-       xt_mapping:field(':address/zip', #address.zip),
-       xt_mapping:field(':address/country', #address.country)]).
+register_mappings() ->
+    Addr =
+        xt_mapping:mapping(
+          #address{},
+          [xt_mapping:field(':address/street', #address.street),
+           xt_mapping:field(':address/city', #address.city),
+           xt_mapping:field(':address/zip', #address.zip),
+           xt_mapping:field(':address/country', #address.country)]),
+    Person =
+        xt_mapping:mapping(
+          #person{},
+          [xt_mapping:idmap(#person.person_id, ':person'),
+           xt_mapping:field(':person/first-name', #person.first_name),
+           xt_mapping:field(':person/last-name', #person.last_name),
+           xt_mapping:field(':person/email', #person.email),
+           xt_mapping:local_date(':person/date-of-birth', #person.date_of_birth),
+           xt_mapping:embed('shipping-', Addr, #person.shipping_address),
+           xt_mapping:embed('billing-', Addr, #person.billing_address)]),
+    xt_mapping:register(Addr),
+    xt_mapping:register(Person).
 
-person_mapping() ->
-    Addr = address_mapping(),
-    xt_mapping:mapping(
-      #person{},
-      [xt_mapping:idmap(#person.person_id, ':person'),
-       xt_mapping:field(':person/first-name', #person.first_name),
-       xt_mapping:field(':person/last-name', #person.last_name),
-       xt_mapping:field(':person/email', #person.email),
-       xt_mapping:local_date(':person/date-of-birth', #person.date_of_birth),
-       xt_mapping:embed('shipping-', Addr, #person.shipping_address),
-       xt_mapping:embed('billing-', Addr, #person.billing_address)
-      ]).
 
 person(Id,Fn,Ln,Email,Dob,Billing,Shipping) ->
     #person{person_id = Id,
@@ -45,16 +46,9 @@ person(Id,Fn,Ln,Email,Dob,Billing,Shipping) ->
             billing_address = Billing,
             shipping_address = Shipping}.
 
-put(Person) ->
-    xt:put(xt_mapping:to_doc(Person, person_mapping())).
-
-qlike(Person) ->
-    xt_mapping:qlike(Person, person_mapping()).
-
-
-add_persons() ->
-    lists:foreach(
-      fun put/1,
+init() ->
+    register_mappings(),
+    xt:put(
       [#person{person_id="01234-abc",
                first_name="Max", last_name="Feedpressure",
                email="max@example.com", date_of_birth={1981, 4, 8}},

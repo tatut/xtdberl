@@ -1,5 +1,6 @@
+%% @doc The main API namespace for using XTDB.
 -module(xt).
--export([q/3, q/2, put/1, status/0, demo/0]).
+-export([q/3, q/2, put/1, status/0, ql/1, ql/2]).
 -include("types.hrl").
 %% Convenient interface to XTDB process
 
@@ -25,12 +26,25 @@ q(Find, Where, In) ->
             timeout
     end.
 
--spec put(doclike()) -> {ok, #txinfo{}} | {error, any()}.
+-spec put(doclike() | [doclike()]) -> {ok, #txinfo{}} | {error, any()}.
 
+doclist([],Acc) -> Acc;
+doclist([D|Docs], Acc) ->
+    doclist(Docs, [doc(D) | Acc]);
+doclist(X,[]) -> [doc(X)].
 
+doc(Record) when is_tuple(Record) ->
+    xt_mapping:to_doc(Record,
+                      xt_mapping:get(element(1,Record)));
+doc(Map) when is_map(Map) -> Map.
+
+%% @doc Put a new document into the database.
+%% Doc can be a record that has an installed mapping or a
+%% raw key/value document map.
+%% If document is a list, then multiple documents are put.
 put(Doc) ->
     MsgId = make_ref(),
-    pid() ! {put, self(), MsgId, Doc},
+    pid() ! list_to_tuple([put, self(), MsgId] ++ doclist(Doc,[])),
     receive
         {ok, MsgId, TxInfo} ->
             {ok, TxInfo};
@@ -48,12 +62,16 @@ status() ->
     after 5000 -> timeout
     end.
 
+%% @doc Query Like record instances. Takes a candidate instance
+%% and creates a query to find similar instances. Requires a
+%% record/doc mapping to work. Uses the mapping registered with
+%% a call to xt_mapping:register/1.
+ql(Candidate) when is_tuple(Candidate) ->
+    RecordType = element(1, Candidate),
+    ql(Candidate,[{mapping, xt_mapping:get(RecordType)}]).
 
-demo() ->
-    Result = q([x,jotain], %% :find clause
-               [[x, ':jotain', jotain],
-                [x, ':name', foo]],  %% :where clauses
-               [{foo, "hep"}] %% :in parameters as an orddict
-              ),
-    io:format("Got result: ~p~n", [Result]),
-    Result.
+ql(Candidate,Options) when is_tuple(Candidate) ->
+    Mapping = orddict:fetch(mapping, Options),
+    {Query,Where,In} = xt_mapping:qlike(Candidate, Mapping),
+    {ok, Results} = q(Query,Where,In),
+    xt_mapping:read_results(Results, Mapping).

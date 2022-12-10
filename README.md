@@ -33,8 +33,8 @@ $ ./run.sh rocksdb
 Then you can use the library in the Erlang shell:
 ```erlang
 
-%% Add some example data
-1> xt_demo:add_persons().
+%% Register mappings and add some example data
+1> xt_demo:init().
 ok
 
 %% Define records in shell for easy access
@@ -42,7 +42,7 @@ ok
 [address,person]
 
 %% Use qlike to query
-3> xt_demo:qlike(#person{first_name="Annika"}).
+3> xt:ql(#person{first_name="Annika"}).
 [#person{person_id = "456456-666",first_name = "Annika",
          last_name = "Andersson",email = "aa@existerar-inte.se",
          date_of_birth = {1986,5,27},
@@ -50,6 +50,9 @@ ok
          billing_address = #address{street = "Svensk gatan 6",
                                     city = "Stockholm",zip = "666123",country = ':SE'}}]
 ```
+
+You can browse what is stored in the XTDB database using the included inspector.
+Just open a web browser to [http://localhost:3000/tx](http://localhost:3000/tx).
 
 ## Build the library
 

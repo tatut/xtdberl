@@ -1,9 +1,10 @@
 %% @doc Mapping from records to XTDB documents
 -module(xt_mapping).
--export([to_doc/2, to_rec/2,
+-export([to_doc/2, to_rec/2, register/1, get/1,
          mapping/2, idmap/2, embed/2, embed/3,
          field/2, field/4, local_date/2, local_datetime/2,
-         attributes/1, qlike/2]).
+         attributes/1,
+         qlike/2, read_results/2]).
 -include("xt_mapping.hrl").
 
 %% Maybe run value through conversion function
@@ -133,6 +134,14 @@ prefix_name(Prefix,#field{attr=Attr}=F) ->
 prefix_name(_,M) -> M.
 
 
+%% @doc Register mapping in global registry.
+register(#mapping{empty=Rec}=Mapping) ->
+    persistent_term:put({xt_mapping,element(1,Rec)}, Mapping).
+
+%% @doc Get a mapping from the global registry.
+get(RecordType) ->
+    persistent_term:get({xt_mapping,RecordType}).
+
 %% @doc Return all XTDB attributes specified in the mapping. Uses an empty record instance.
 attributes(#mapping{fields = Fields}) ->
     lists:foldl(fun attributes/2, [],  Fields).
@@ -192,13 +201,17 @@ where_in(WhereIn0, Candidate, Mapping) ->
       end,
       WhereIn0, Mapping#mapping.fields).
 
-%% @doc Search instances by providing a candidate record. Record values may be
-%% direct values to match or tuples containing {op, Val} where op is one of
-%% the supported operations:
+%% @doc Generate a query to search instances matching a candidate record.
+%% Record values may be direct values to match or tuples containing {op, Val}
+%% where op is one of the supported operations:
 %% - <, <=, >, >=  range predicate operators
 %% - textsearch    search using Lucene index
+%%
+%% Returns a tuple containing the datalog query {Find, Where, In}.
 qlike(Candidate, Mapping) ->
     {Where,In} = where_in({[],[]}, Candidate, Mapping),
-    {ok, Results} = xt:q([[pull,qlike,attributes(Mapping)]],
-                         Where, In),
+    Find = [[pull,qlike,attributes(Mapping)]],
+    {Find, Where, In}.
+
+read_results(Results, Mapping) ->
     [to_rec(R, Mapping) || [R] <- Results].
