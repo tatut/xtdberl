@@ -200,6 +200,10 @@ qlike_eq(Attr,Val,{Where,In}) ->
     {Where ++ [[qlike, Attr, NextParam]],
      [{NextParam, Val} | In]}.
 
+qlike_req(Attr,{Where,In}) ->
+    %% Add required filed, just [qlike :some-attr] without value
+    {[[qlike, Attr] | Where], In}.
+
 qlike_textsearch(Attr, Term, {Where,In}) ->
     NextParam = next_param(In), %% prepare lucene search string
     {Where ++ [[{'text-search', Attr, NextParam}, [[qlike]]]],
@@ -217,10 +221,13 @@ qlike_where(Attr, Conv, Val, WhereIn) ->
 
 where_in(WhereIn0, Candidate, Mapping) ->
     lists:foldl(
-      fun(#field{attr=Name,field=Field,to_xtdb=Conv}, WhereIn) ->
+      fun(#field{attr=Name,field=Field,to_xtdb=Conv,required=Req}, WhereIn) ->
               Val = element(Field, Candidate),
               case Val of
-                  undefined -> WhereIn;
+                  undefined ->
+                      if Req -> qlike_req(Name,WhereIn);
+                         true -> WhereIn
+                      end;
                   _ -> qlike_where(Name, Conv, Val, WhereIn)
               end;
          (#embed{field=Field,mapping=EmbedMapping}, WhereIn) ->
@@ -231,6 +238,11 @@ where_in(WhereIn0, Candidate, Mapping) ->
               end;
          (#static{attr=Attr,value=Val}, WhereIn) ->
               qlike_eq(Attr, Val, WhereIn);
+         (#conversion{record_to_xtdb = RecordToXtdb}, WhereIn) ->
+              %% Run conversion on an empty map and add any attrs
+              maps:fold(fun(Attr,Val,Acc) -> qlike_eq(Attr, Val, Acc) end,
+                        WhereIn,
+                        RecordToXtdb(Candidate, #{}));
          (_, WhereIn) -> WhereIn
       end,
       WhereIn0, Mapping#mapping.fields).
