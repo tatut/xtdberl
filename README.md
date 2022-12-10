@@ -58,6 +58,18 @@ ok
          shipping_address = undefined,
          billing_address = #address{street = "Svensk gatan 6",
                                     city = "Stockholm",zip = "666123",country = ':SE'}}]
+
+%% Add new person
+4> xt:put(#person{person_id="demo1", first_name="Donna", last_name="Demonstration"}).
+{ok,...}
+
+%% Query also works by id
+5> xt:ql(#person{person_id="demo1"})
+[#person{person_id = "demo1",first_name = "Donna",
+         last_name = "Demonstration",email = undefined,
+         date_of_birth = undefined,shipping_address = undefined,
+         billing_address = undefined}]
+
 ```
 
 You can browse what is stored in the XTDB database using the included inspector.
