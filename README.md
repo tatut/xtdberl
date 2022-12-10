@@ -4,9 +4,14 @@ xtdberl
 *** ALPHA status, don't use this yet! ***
 
 
-Use XTDB from Erlang/OTP. Contains Erlang libraries that send queries and documents to XTDB node.
+Use [XTDB](https://xtdb.com) from Erlang/OTP. Contains Erlang libraries that send queries and documents to XTDB node.
 
 The XTDB node uses jinterface to appear like an Erlang process, you send it commands and it responds.
+
+Features:
+- Map Erlang records to XTDB documents
+- Query by giving candidate instances
+- Query by text search and comparison operators
 
 ## Quickstart
 

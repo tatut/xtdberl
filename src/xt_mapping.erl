@@ -204,8 +204,18 @@ where_in(WhereIn0, Candidate, Mapping) ->
 %% @doc Generate a query to search instances matching a candidate record.
 %% Record values may be direct values to match or tuples containing {op, Val}
 %% where op is one of the supported operations:
-%% - <, <=, >, >=  range predicate operators
-%% - textsearch    search using Lucene index
+%% <ul>
+%%  <li><code>&lt;</code> less than</li>
+%%  <li><code>&lt;=</code> less than or equals</li>
+%%  <li><code>&gt;</code> greater than</li>
+%%  <li><code>&gt;=</code> greater than or equals</li>
+%%  <li><code>textsearch</code>  Lucene text search</li>
+%% </ul>
+%%
+%% The comparison operators can be used on any field type including
+%% numbers, strings, dates and so on. But for better text searching
+%% it is better to the <code>textsearch</code> operator.
+%% @see xt_lucene
 %%
 %% Returns a tuple containing the datalog query {Find, Where, In}.
 qlike(Candidate, Mapping) ->

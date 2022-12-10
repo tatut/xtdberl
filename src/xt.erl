@@ -53,6 +53,8 @@ put(Doc) ->
     after 5000 -> timeout
     end.
 
+-spec status() -> map().
+%% @doc Return XTDB node status information.
 status() ->
     MsgId = make_ref(),
     pid() ! {status, self(), MsgId},
@@ -62,14 +64,22 @@ status() ->
     after 5000 -> timeout
     end.
 
-%% @doc Query Like record instances. Takes a candidate instance
-%% and creates a query to find similar instances. Requires a
-%% record/doc mapping to work. Uses the mapping registered with
-%% a call to xt_mapping:register/1.
+%% @doc Query Like record instances.
+%% Takes a candidate instance and creates a query to find similar instances.
+%% Requires that a record mapping is registered beforehand.
+%% @see xt_mapping:register/1.
+%% @see xt_mapping:qlike/2.
 ql(Candidate) when is_tuple(Candidate) ->
     RecordType = element(1, Candidate),
     ql(Candidate,[{mapping, xt_mapping:get(RecordType)}]).
 
+-spec ql(tuple(), [{atom(),any()}]) -> [tuple()].
+%% @doc Query Like record instances with options.
+%% The supported options are:
+%% <dl>
+%%   <dt>mapping</dt><dd>the record mapping to use</dd>
+%% </dl>
+%% @see xt_mapping:qlike/2.
 ql(Candidate,Options) when is_tuple(Candidate) ->
     Mapping = orddict:fetch(mapping, Options),
     {Query,Where,In} = xt_mapping:qlike(Candidate, Mapping),
