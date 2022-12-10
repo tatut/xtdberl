@@ -1,8 +1,17 @@
 %% @doc Mapping from records to XTDB documents
 -module(xt_mapping).
--export([to_doc/2, to_rec/2, register/1, get/1,
+-export([%% Basic conversion to and from documents
+         to_doc/2, to_rec/2,
+
+         %% Mapping registry
+         register/1, get/1,
+
+         %% Functions for creating mappings
          mapping/2, idmap/2, embed/2, embed/3,
          field/2, field/4, local_date/2, local_datetime/2,
+         required/1, static/2,
+
+         %% Support for querying by records
          attributes/1,
          qlike/2, read_results/2]).
 -include("xt_mapping.hrl").
@@ -25,7 +34,9 @@ to_doc(Record, #mapping{fields = Fields}) ->
                         case element(Field, Record) of
                             undefined -> Doc;
                             E -> maps:merge(Doc, to_doc(E, EmbedMapping))
-                        end
+                        end;
+                   (#static{attr=Attr,value=Val}, Doc) ->
+                           maps:put(Attr, Val, Doc)
                 end,
                 #{}, Fields).
 
@@ -42,7 +53,8 @@ to_rec(Doc, #mapping{empty = Empty, fields = Fields}) ->
 
                             %% Embedded had some values
                             Val -> setelement(Field, Rec, Val)
-                        end
+                        end;
+                   (#static{}, Rec) -> Rec
 
                 end,
                 Empty, Fields).
@@ -102,6 +114,22 @@ local_datetime(Attr,Field) ->
                   {{Y,M,D}, {H,Mi,S}}
           end).
 
+%% @doc Make field required. This affects queries, only documents that
+%% have a value for this attribute will be considered. The value can be
+%% anything (including nil).
+required(Field) ->
+    Field#field{required=true}.
+
+%% @doc Create an attribute that has a static value. Every document
+%% created will have this attribute added with the given value. Queries
+%% will only return documents where this value is the correct value.
+%% The value will not be part of the Erlang record.
+%%
+%% As document the database is untyped, this is useful if you need to
+%% encode a "type" attribute for the documents if there are no required
+%% fields that discriminate it from all other documents.
+static(Attr, Value) ->
+    #static{attr=Attr, value=Value}.
 
 %% @doc Create a record mapping
 mapping(EmptyRecordValue, FieldMappings) ->
@@ -148,7 +176,8 @@ attributes(#mapping{fields = Fields}) ->
 
 attributes(#field{attr=A}, Acc) -> [A | Acc];
 attributes(#conversion{attrs=Attrs}, Acc) -> Attrs ++ Acc;
-attributes(#embed{mapping=M}, Acc) -> attributes(M) ++ Acc.
+attributes(#embed{mapping=M}, Acc) -> attributes(M) ++ Acc;
+attributes(#static{}, Acc) -> Acc.
 
 next_param(In) ->
     list_to_atom( "p" ++ integer_to_list(length(In)) ).
@@ -197,6 +226,8 @@ where_in(WhereIn0, Candidate, Mapping) ->
                   EmbedCandidate ->
                       where_in(WhereIn, EmbedCandidate, EmbedMapping)
               end;
+         (#static{attr=Attr,value=Val}, WhereIn) ->
+              qlike_eq(Attr, Val, WhereIn);
          (_, WhereIn) -> WhereIn
       end,
       WhereIn0, Mapping#mapping.fields).

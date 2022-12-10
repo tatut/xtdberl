@@ -71,3 +71,12 @@ Just open a web browser to [http://localhost:3000/tx](http://localhost:3000/tx).
 
 The `xtdb` folder contains the Clojure project for running the database node.
 The database node acts as an Erlang named process that accepts queries and commands.
+
+## TODO
+
+Here are some planned features:
+
+* Projection (pull only some fields)
+* Query ids and pull by ids (for doing fine grained pagination things)
+* Batching results (send results back by messages of wanted size)
+* Mapping for linked documents (query and pull them)

@@ -28,6 +28,7 @@ register_mappings() ->
         xt_mapping:mapping(
           #person{},
           [xt_mapping:idmap(#person.person_id, ':person'),
+           xt_mapping:static(':type', ':person'),
            xt_mapping:field(':person/first-name', #person.first_name),
            xt_mapping:field(':person/last-name', #person.last_name),
            xt_mapping:field(':person/email', #person.email),
