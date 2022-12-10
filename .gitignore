@@ -24,3 +24,4 @@ xtdb/.nrepl-port
 /xtdb/OtpErlang.jar
 /.lsp/
 /.clj-kondo/
+/xtdb/.rocksdb/
