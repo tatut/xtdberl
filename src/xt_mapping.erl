@@ -70,15 +70,26 @@ idmap(Field, Key) ->
        attrs = [':xt/id'],
 
        %% Read function to set id field when creating record from doc
-       xtdb_to_record = fun(Doc,Rec) ->
-                                IdMap = maps:get(':xt/id', Doc),
-                                Id = maps:get(Key, IdMap),
-                                setelement(Field, Rec, Id)
-                        end,
+       xtdb_to_record =
+           fun(Doc,Rec) ->
+                   case maps:get(':xt/id', Doc, undefined) of
+                       undefined -> Rec;
+                       IdMap when is_map(IdMap) ->
+                           Id = maps:get(Key, IdMap),
+                           setelement(Field, Rec, Id);
+                       Else ->
+                           logger:warning("Encountered invalid :xt/id value, not a map: ~p", [Else]),
+                           setelement(Field, Rec, Else)
+                   end
+           end,
        %% Write function to set doc :xt/id when creating doc from record
-       record_to_xtdb = fun(Rec,Doc) ->
-                                maps:put(':xt/id', #{ Key => element(Field, Rec) }, Doc)
-                        end}.
+       record_to_xtdb =
+           fun(Rec,Doc) ->
+                   case element(Field, Rec) of
+                       undefined -> Doc;
+                       Val -> maps:put(':xt/id', #{Key => Val}, Doc)
+                   end
+           end}.
 
 %% @doc Normal field mapping without any special conversion
 field(Attr, Field) -> field(Attr, Field, undefined, undefined).
