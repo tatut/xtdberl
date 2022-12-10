@@ -13,6 +13,10 @@ Features:
 - Query by giving candidate instances
 - Query by text search and comparison operators
 
+## Documentation
+
+Automatically generated edoc is available [here](https://tatut.github.io/xtdberl/).
+
 ## Quickstart
 
 Open two shells, one for Erlang shell and one for the XTDB node.
