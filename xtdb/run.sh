@@ -1,3 +1,5 @@
 #!/bin/sh
 
-clj -M:dev -m xtdberl.main dev.config.edn
+CONFIG=${1:-dev}
+
+clj -M:dev:$CONFIG -m xtdberl.main $CONFIG.config.edn
