@@ -24,9 +24,12 @@ conv(Fun, Val) ->  Fun(Val).
 %% @doc Convert Erlang record tuple to an XTDB document map using mapping
 -spec to_doc(tuple(), #mapping{}) -> #{atom() => any()}.
 to_doc(Record, #mapping{fields = Fields}) ->
-    lists:foldl(fun(#field{attr=Name,field=Field,to_xtdb=Conv}, Doc) ->
+    lists:foldl(fun(#field{attr=Name,field=Field,to_xtdb=Conv,required=Req}, Doc) ->
                         case conv(Conv, element(Field, Record)) of
-                            undefined -> Doc;
+                            undefined ->
+                                if Req -> throw({required_field_missing, Field, attr, Name});
+                                   true -> Doc
+                                end;
                             Val -> maps:put(Name, Val, Doc)
                         end;
                    (#conversion{record_to_xtdb=Write}, Doc) -> Write(Record, Doc);

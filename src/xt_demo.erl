@@ -16,27 +16,28 @@
                  shipping_address :: #address{},
                  billing_address :: #address{}}).
 
+-define(M, xt_mapping).
 register_mappings() ->
     Addr =
-        xt_mapping:mapping(
+        ?M:mapping(
           #address{},
-          [xt_mapping:field(':address/street', #address.street),
-           xt_mapping:field(':address/city', #address.city),
-           xt_mapping:field(':address/zip', #address.zip),
-           xt_mapping:field(':address/country', #address.country)]),
+          [?M:field(':address/street', #address.street),
+           ?M:field(':address/city', #address.city),
+           ?M:field(':address/zip', #address.zip),
+           ?M:field(':address/country', #address.country)]),
     Person =
-        xt_mapping:mapping(
+        ?M:mapping(
           #person{},
-          [xt_mapping:idmap(#person.person_id, ':person'),
-           xt_mapping:static(':type', ':person'),
-           xt_mapping:field(':person/first-name', #person.first_name),
-           xt_mapping:field(':person/last-name', #person.last_name),
-           xt_mapping:field(':person/email', #person.email),
-           xt_mapping:local_date(':person/date-of-birth', #person.date_of_birth),
-           xt_mapping:embed('shipping-', Addr, #person.shipping_address),
-           xt_mapping:embed('billing-', Addr, #person.billing_address)]),
-    xt_mapping:register(Addr),
-    xt_mapping:register(Person).
+          [?M:idmap(#person.person_id, ':person'),
+           ?M:static(':type', ':person'),
+           ?M:required(?M:field(':person/first-name', #person.first_name)),
+           ?M:field(':person/last-name', #person.last_name),
+           ?M:field(':person/email', #person.email),
+           ?M:local_date(':person/date-of-birth', #person.date_of_birth),
+           ?M:embed('shipping-', Addr, #person.shipping_address),
+           ?M:embed('billing-', Addr, #person.billing_address)]),
+    ?M:register(Addr),
+    ?M:register(Person).
 
 
 person(Id,Fn,Ln,Email,Dob,Billing,Shipping) ->
@@ -46,6 +47,7 @@ person(Id,Fn,Ln,Email,Dob,Billing,Shipping) ->
             date_of_birth = Dob,
             billing_address = Billing,
             shipping_address = Shipping}.
+
 
 init() ->
     register_mappings(),
