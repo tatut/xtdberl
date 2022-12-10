@@ -1,0 +1,17 @@
+{application, xt,
+ [{description, "XTDB interface OTP library"},
+  {vsn, "0.1.0"},
+  {registered, [xtdb]},
+  {applications,
+   [kernel,
+    stdlib
+   ]},
+  %% Configure where XTDB nodes are located
+  {env,[]},
+  {mod,{xt,[{xtdb_nodes,
+             [%% XTDB has a named mailbox at node
+              {xtdb, xtdb@localhost}]}]}},
+  {modules, [xt, xt_mapping, xt_lucene]},
+  {licenses, []},
+  {links, []}
+ ]}.

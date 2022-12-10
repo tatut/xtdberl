@@ -1,11 +1,94 @@
-%% @doc The main API namespace for using XTDB.
+%% @doc The main application and API namespace for using XTDB.
 -module(xt).
--export([q/3, q/2, put/1, status/0, ql/1, ql/2]).
+-export([start/2, stop/1, init/1, monitor_xtdb/2,
+         register_xtdb_node/1,
+         q/3, q/2, put/1, status/0, ql/1, ql/2]).
 -include("types.hrl").
-%% Convenient interface to XTDB process
 
-%% FIXME: configure where the xtdb is located
-pid() -> {xtdb, xtdb@localhost}.
+%%%%%%%%%%%
+% Application lifecycle functions
+
+start(Type, Args) ->
+    io:format("START ~p ~p~n", [Type,Args]),
+    Nodes = orddict:fetch(xtdb_nodes,Args),
+    logger:info("Starting XTDB interface with ~p node(s)",[length(Nodes)]),
+    Pid = spawn(?MODULE, init, [Nodes]),
+    register(xtdb, Pid),
+    {ok, Pid}.
+
+stop(X) ->
+    logger:info("Stopping XTDB interface ~p~n", [X]),
+    ok.
+
+init(Nodes) ->
+    %% Spawn a process that monitors each node
+    Me = self(),
+    lists:foreach(fun(N) -> spawn(?MODULE, monitor_xtdb, [Me, N]) end, Nodes),
+    loop([]).
+
+%% @doc Add a new XTDB node
+-spec register_xtdb_node({atom(), atom()}) -> ok.
+register_xtdb_node(Node) ->
+    Pid = whereis(xtdb),
+    spawn(?MODULE, monitor_xtdb, monitor_xtdb, [Pid, Node]).
+
+monitor_xtdb(Parent, Node) ->
+    logger:debug("Monitoring XTDB node: ~p for parent ~p~n", [Node,Parent]),
+    monitor_xtdb(1000, Parent, Node, undefined).
+
+%% Monitor an XTDB jinterface node availability by pinging it.
+%% Notifies the application process when nodes are up/down so it
+%% can keep track of what nodes are available.
+monitor_xtdb(Wait, Parent, {_, Node}=N, PreviousStatus) ->
+    timer:sleep(Wait),
+    NewStatus = net_adm:ping(Node),
+    case {PreviousStatus, NewStatus} of
+        {undefined, pong} -> Parent ! {xtdb_up, N};
+        {undefined, pang} -> Parent ! {xtdb_down, N};
+        {pang, pong} -> Parent ! {xtdb_up, N};
+        {pong, pang} -> Parent ! {xtdb_down, N};
+        {pang, pang} -> still_down;
+        {pong, pong} -> still_up
+    end,
+    monitor_xtdb(5000, Parent, N, NewStatus).
+
+loop(AvailableNodes) ->
+    receive
+        {get_node, From} ->
+            case AvailableNodes of
+                [] -> From ! no_available_xtdb_node;
+                [N|_] -> From ! {xtdb_node, N}
+            end;
+        {xtdb_up, Node} ->
+            %% Add node to available
+            logger:info("XTDB node up: ~p", [Node]),
+            NewNodes = [Node|AvailableNodes],
+            if length(NewNodes) == 1 ->
+                    logger:notice("1 XTDB node is now available.");
+               true -> ok
+            end,
+            loop(NewNodes);
+        {xtdb_down, Node} ->
+            %% Remove node from available
+            logger:info("XTDB node down: ~p", [Node]),
+            NewNodes = lists:delete(Node, AvailableNodes),
+            if length(NewNodes) == 0 ->
+                    logger:alert("No XTDB nodes available, subsequent queries and transactions will fail!");
+               true -> ok
+            end,
+            loop(NewNodes);
+        Else ->
+            logger:warning("Unrecognized message received: ~p", [Else])
+    end,
+    loop(AvailableNodes).
+
+
+pid() ->
+    xtdb ! {get_node, self()},
+    receive
+        {xtdb_node, Node} -> Node;
+        no_available_xtdb_node -> throw(no_available_xtdb_node)
+    end.
 
 q(Find, Where) -> q(Find,Where,[]).
 q(Find, Where, In) ->
@@ -83,5 +166,7 @@ ql(Candidate) when is_tuple(Candidate) ->
 ql(Candidate,Options) when is_tuple(Candidate) ->
     Mapping = orddict:fetch(mapping, Options),
     {Query,Where,In} = xt_mapping:qlike(Candidate, Mapping),
-    {ok, Results} = q(Query,Where,In),
-    xt_mapping:read_results(Results, Mapping).
+    case q(Query,Where,In) of
+        {ok, Results} -> xt_mapping:read_results(Results, Mapping);
+        timeout -> timeout
+    end.
