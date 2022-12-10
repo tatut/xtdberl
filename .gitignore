@@ -25,3 +25,4 @@ xtdb/.nrepl-port
 /.lsp/
 /.clj-kondo/
 /xtdb/.rocksdb/
+/.DS_Store

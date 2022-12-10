@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module xt_mapping</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module xt_mapping</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>Mapping from records to XTDB documents.
+
+
+<h2><a name="description">Description</a></h2>Mapping from records to XTDB documents
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#attributes-1">attributes/1</a></td><td>Return all XTDB attributes specified in the mapping.</td></tr>
+<tr><td valign="top"><a href="#embed-2">embed/2</a></td><td>Create a field mapping that embeds another records information in the same document.</td></tr>
+<tr><td valign="top"><a href="#embed-3">embed/3</a></td><td></td></tr>
+<tr><td valign="top"><a href="#field-2">field/2</a></td><td>Normal field mapping without any special conversion.</td></tr>
+<tr><td valign="top"><a href="#field-4">field/4</a></td><td>Field with special mapping to and from XTDB values.</td></tr>
+<tr><td valign="top"><a href="#get-1">get/1</a></td><td>Get a mapping from the global registry.</td></tr>
+<tr><td valign="top"><a href="#idmap-2">idmap/2</a></td><td>Create an ':xt/id' mapping for a Field as Key.</td></tr>
+<tr><td valign="top"><a href="#local_date-2">local_date/2</a></td><td>Create a field that is stored as a local date.</td></tr>
+<tr><td valign="top"><a href="#local_datetime-2">local_datetime/2</a></td><td>Create a field that is stored as a date and time.</td></tr>
+<tr><td valign="top"><a href="#mapping-2">mapping/2</a></td><td>Create a record mapping.</td></tr>
+<tr><td valign="top"><a href="#qlike-2">qlike/2</a></td><td>Generate a query to search instances matching a candidate record.</td></tr>
+<tr><td valign="top"><a href="#read_results-2">read_results/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#register-1">register/1</a></td><td>Register mapping in global registry.</td></tr>
+<tr><td valign="top"><a href="#to_doc-2">to_doc/2</a></td><td>Convert Erlang record tuple to an XTDB document map using mapping.</td></tr>
+<tr><td valign="top"><a href="#to_rec-2">to_rec/2</a></td><td>Convert an XTDB document map (as gotten by pull) to an Erlang record tuple using mapping.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="attributes-1">attributes/1</a></h3>
+<div class="spec">
+<p><tt>attributes(Mapping) -&gt; any()</tt></p>
+<p> </p>
+</div><p>Return all XTDB attributes specified in the mapping. Uses an empty record instance.</p>
+
+<h3 class="function"><a name="embed-2">embed/2</a></h3>
+<div class="spec">
+<p><tt>embed(Mapping::#mapping{}, Field::integer()) -&gt; #embed{}</tt><br></p>
+<p> </p>
+</div><p><p>Create a field mapping that embeds another records information in the same document.  
+This is convenient to not need shredding the documents, simply use the same document for  
+all attributes. You can optionally specify prefix to apply for the embedded fields (for  
+example when embedding multiple records of the same type, like shipping and billing address).</p>
+ 
+  The prefix, if any, is applied to the start of the name, so if we have a record mapping for address
+  that maps ':address/postal-code' and so on and we embed two records with shipping- and billing-
+  prefixes, we will get ':shipping-address/postal-code' and ':billing-address/postal-code' attributes
+  in the document.</p>
+
+<h3 class="function"><a name="embed-3">embed/3</a></h3>
+<div class="spec">
+<p><tt>embed(Prefix::atom(), Mapping::#mapping{}, Field::integer()) -&gt; #embed{}</tt><br></p>
+<p> </p>
+</div>
+
+<h3 class="function"><a name="field-2">field/2</a></h3>
+<div class="spec">
+<p><tt>field(Attr, Field) -&gt; any()</tt></p>
+<p> </p>
+</div><p>Normal field mapping without any special conversion</p>
+
+<h3 class="function"><a name="field-4">field/4</a></h3>
+<div class="spec">
+<p><tt>field(Attr, Field, ToXTDB, FromXTDB) -&gt; any()</tt></p>
+<p> </p>
+</div><p>Field with special mapping to and from XTDB values.
+  ToXTDB is called to convert the fields value when sending to XTDB and
+  FromXTDB is called before setting values received form XTDB to a record.</p>
+
+<h3 class="function"><a name="get-1">get/1</a></h3>
+<div class="spec">
+<p><tt>get(RecordType) -&gt; any()</tt></p>
+<p> </p>
+</div><p>Get a mapping from the global registry.</p>
+
+<h3 class="function"><a name="idmap-2">idmap/2</a></h3>
+<div class="spec">
+<p><tt>idmap(Field::integer(), Key::atom()) -&gt; #conversion{}</tt><br></p>
+<p> </p>
+</div><p>Create an ':xt/id' mapping for a Field as Key.</p>
+
+<h3 class="function"><a name="local_date-2">local_date/2</a></h3>
+<div class="spec">
+<p><tt>local_date(Attr, Field) -&gt; any()</tt></p>
+<p> </p>
+</div><p>Create a field that is stored as a local date</p>
+
+<h3 class="function"><a name="local_datetime-2">local_datetime/2</a></h3>
+<div class="spec">
+<p><tt>local_datetime(Attr, Field) -&gt; any()</tt></p>
+<p> </p>
+</div><p>Create a field that is stored as a date and time</p>
+
+<h3 class="function"><a name="mapping-2">mapping/2</a></h3>
+<div class="spec">
+<p><tt>mapping(EmptyRecordValue, FieldMappings) -&gt; any()</tt></p>
+<p> </p>
+</div><p>Create a record mapping</p>
+
+<h3 class="function"><a name="qlike-2">qlike/2</a></h3>
+<div class="spec">
+<p><tt>qlike(Candidate, Mapping) -&gt; any()</tt></p>
+<p> </p>
+</div><p>Generate a query to search instances matching a candidate record.
+  Record values may be direct values to match or tuples containing {op, Val}
+  where op is one of the supported operations:
+  <ul>
+   <li><code>&lt;</code> less than</li>
+   <li><code>&lt;=</code> less than or equals</li>
+   <li><code>&gt;</code> greater than</li>
+   <li><code>&gt;=</code> greater than or equals</li>
+   <li><code>textsearch</code>  Lucene text search</li>
+  </ul>
+ 
+  The comparison operators can be used on any field type including
+  numbers, strings, dates and so on. But for better text searching
+  it is better to the <code>textsearch</code> operator.
+  Returns a tuple containing the datalog query {Find, Where, In}.</p>
+<p><b>See also:</b> <a href="xt_lucene.html">xt_lucene</a>.</p>
+
+<h3 class="function"><a name="read_results-2">read_results/2</a></h3>
+<div class="spec">
+<p><tt>read_results(Results, Mapping) -&gt; any()</tt></p>
+<p> </p>
+</div>
+
+<h3 class="function"><a name="register-1">register/1</a></h3>
+<div class="spec">
+<p><tt>register(Mapping) -&gt; any()</tt></p>
+<p> </p>
+</div><p>Register mapping in global registry.</p>
+
+<h3 class="function"><a name="to_doc-2">to_doc/2</a></h3>
+<div class="spec">
+<p><tt>to_doc(Record::tuple(), Mapping::#mapping{}) -&gt; #{atom() =&gt; any()}</tt><br></p>
+<p> </p>
+</div><p>Convert Erlang record tuple to an XTDB document map using mapping</p>
+
+<h3 class="function"><a name="to_rec-2">to_rec/2</a></h3>
+<div class="spec">
+<p><tt>to_rec(Doc::#{atom() =&gt; any()}, Mapping::#mapping{}) -&gt; tuple()</tt><br></p>
+<p> </p>
+</div><p>Convert an XTDB document map (as gotten by pull) to an Erlang record tuple using mapping</p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc</i></p>
+</body>
+</html>

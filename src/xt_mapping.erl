@@ -215,9 +215,8 @@ where_in(WhereIn0, Candidate, Mapping) ->
 %% The comparison operators can be used on any field type including
 %% numbers, strings, dates and so on. But for better text searching
 %% it is better to the <code>textsearch</code> operator.
-%% @see xt_lucene
-%%
 %% Returns a tuple containing the datalog query {Find, Where, In}.
+%% @see xt_lucene
 qlike(Candidate, Mapping) ->
     {Where,In} = where_in({[],[]}, Candidate, Mapping),
     Find = [[pull,qlike,attributes(Mapping)]],
