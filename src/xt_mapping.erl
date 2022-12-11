@@ -230,6 +230,11 @@ qlike_between(Attr, Low, High, {Where, In}) ->
                [{'<=', NextWhere, HighParam}]],
      [{LowParam, Low}, {HighParam, High} | In]}.
 
+qlike_in(Attr, Values, {Where, In}) ->
+    NextParam = next_param(In),
+    {Where ++ [[qlike, Attr, NextParam]],
+     [{[NextParam, '...'], Values} | In]}.
+
 qlike_where(Attr, Conv, Val, WhereIn) ->
     case Val of
         {'<', Val1} -> qlike_op('<', Attr, conv(Conv, Val1), WhereIn);
@@ -238,6 +243,8 @@ qlike_where(Attr, Conv, Val, WhereIn) ->
         {'>=', Val1} -> qlike_op('>=', Attr, conv(Conv, Val1), WhereIn);
         {'between', Low, High} -> qlike_between(Attr, conv(Conv,Low), conv(Conv,High), WhereIn);
         {'textsearch', Term} -> qlike_textsearch(Attr, conv(Conv,Term), WhereIn);
+        {in, Values} -> qlike_in(Attr, lists:map(fun(V) -> conv(Conv,V) end,
+                                                 Values), WhereIn);
         _ -> qlike_eq(Attr, conv(Conv,Val), WhereIn)
     end.
 
@@ -279,6 +286,7 @@ where_in(WhereIn0, Candidate, Mapping) ->
 %%  <li><code>{'&gt;=', Val}</code> greater than or equals</li>
 %%  <li><code>{between,Low,High}</code> between low (inclusive) and high (inclusive)
 %%  <li><code>{textsearch,Term}</code>  Lucene text search</li>
+%%  <li><code>{in,[Val1,...,ValN]}</code>  value is in given list</li>
 %% </ul>
 %%
 %% The comparison operators can be used on any field type including
