@@ -73,6 +73,21 @@ ok
          date_of_birth = undefined,shipping_address = undefined,
          billing_address = undefined}]
 
+%% And by query operators, like textsearch (see below)
+> xt:ql(#person{first_name={textsearch,"Ma*"}}).
+[#person{person_id = "01234-abc",first_name = "Max",
+         last_name = "Feedpressure",email = "max@example.com",
+         date_of_birth = {1981,4,8},
+         shipping_address = undefined,billing_address = undefined},
+ #person{person_id = "234234-444",first_name = "Matti",
+         last_name = "Korhonen",
+         email = "matti@notreallyexisting.org",
+         date_of_birth = {1969,12,20},
+         shipping_address = undefined,
+         billing_address = #address{street = "Isokatu 25",
+                                    city = "Oulu",zip = "90100",
+                                    country = ':FI'}}]
+
 ```
 
 You can browse what is stored in the XTDB database using the included inspector.
