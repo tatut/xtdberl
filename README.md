@@ -100,7 +100,8 @@ The supported operators are:
 | `{textsearch,Term}` | attr value matches Lucene text search pattern Term |
 | `{in,[Val1,...,ValN]}` | attr value is one of the Val1,...,ValN options |
 
-Querying is done by provide
+By default all attributes that have a mapping will be pulled when querying
+instances. Support for restricting fetched attributes is coming soon!
 
 ## Build the library
 
