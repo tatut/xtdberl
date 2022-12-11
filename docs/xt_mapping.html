@@ -28,6 +28,8 @@
 <tr><td valign="top"><a href="#qlike-2">qlike/2</a></td><td>Generate a query to search instances matching a candidate record.</td></tr>
 <tr><td valign="top"><a href="#read_results-2">read_results/2</a></td><td></td></tr>
 <tr><td valign="top"><a href="#register-1">register/1</a></td><td>Register mapping in global registry.</td></tr>
+<tr><td valign="top"><a href="#required-1">required/1</a></td><td>Make field required.</td></tr>
+<tr><td valign="top"><a href="#static-2">static/2</a></td><td>Create an attribute that has a static value.</td></tr>
 <tr><td valign="top"><a href="#to_doc-2">to_doc/2</a></td><td>Convert Erlang record tuple to an XTDB document map using mapping.</td></tr>
 <tr><td valign="top"><a href="#to_rec-2">to_rec/2</a></td><td>Convert an XTDB document map (as gotten by pull) to an Erlang record tuple using mapping.</td></tr>
 </table>
@@ -109,14 +111,16 @@ example when embedding multiple records of the same type, like shipping and bill
 <p><tt>qlike(Candidate, Mapping) -&gt; any()</tt></p>
 <p> </p>
 </div><p>Generate a query to search instances matching a candidate record.
-  Record values may be direct values to match or tuples containing {op, Val}
+  Record values may be direct values to match or tuples containing {op, ...args}
   where op is one of the supported operations:
   <ul>
-   <li><code>&lt;</code> less than</li>
-   <li><code>&lt;=</code> less than or equals</li>
-   <li><code>&gt;</code> greater than</li>
-   <li><code>&gt;=</code> greater than or equals</li>
-   <li><code>textsearch</code>  Lucene text search</li>
+   <li><code>{'&lt;', Val}</code> less than</li>
+   <li><code>{'&lt;=', Val}</code> less than or equals</li>
+   <li><code>{'&gt;', Val}</code> greater than</li>
+   <li><code>{'&gt;=', Val}</code> greater than or equals</li>
+   <li><code>{between,Low,High}</code> between low (inclusive) and high (inclusive)</li>
+   <li><code>{textsearch,Term}</code>  Lucene text search</li>
+   <li><code>{in,[Val1,...,ValN]}</code>  value is in given list</li>
   </ul>
  
   The comparison operators can be used on any field type including
@@ -136,6 +140,27 @@ example when embedding multiple records of the same type, like shipping and bill
 <p><tt>register(Mapping) -&gt; any()</tt></p>
 <p> </p>
 </div><p>Register mapping in global registry.</p>
+
+<h3 class="function"><a name="required-1">required/1</a></h3>
+<div class="spec">
+<p><tt>required(Field) -&gt; any()</tt></p>
+<p> </p>
+</div><p>Make field required. This affects queries, only documents that
+  have a value for this attribute will be considered. The value can be
+  anything (including nil).</p>
+
+<h3 class="function"><a name="static-2">static/2</a></h3>
+<div class="spec">
+<p><tt>static(Attr, Value) -&gt; any()</tt></p>
+<p> </p>
+</div><p><p>Create an attribute that has a static value. Every document  
+created will have this attribute added with the given value. Queries  
+will only return documents where this value is the correct value.  
+The value will not be part of the Erlang record.</p>
+ 
+  As document the database is untyped, this is useful if you need to
+  encode a "type" attribute for the documents if there are no required
+  fields that discriminate it from all other documents.</p>
 
 <h3 class="function"><a name="to_doc-2">to_doc/2</a></h3>
 <div class="spec">

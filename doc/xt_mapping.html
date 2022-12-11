@@ -111,14 +111,16 @@ example when embedding multiple records of the same type, like shipping and bill
 <p><tt>qlike(Candidate, Mapping) -&gt; any()</tt></p>
 <p> </p>
 </div><p>Generate a query to search instances matching a candidate record.
-  Record values may be direct values to match or tuples containing {op, Val}
+  Record values may be direct values to match or tuples containing {op, ...args}
   where op is one of the supported operations:
   <ul>
-   <li><code>&lt;</code> less than</li>
-   <li><code>&lt;=</code> less than or equals</li>
-   <li><code>&gt;</code> greater than</li>
-   <li><code>&gt;=</code> greater than or equals</li>
-   <li><code>textsearch</code>  Lucene text search</li>
+   <li><code>{'&lt;', Val}</code> less than</li>
+   <li><code>{'&lt;=', Val}</code> less than or equals</li>
+   <li><code>{'&gt;', Val}</code> greater than</li>
+   <li><code>{'&gt;=', Val}</code> greater than or equals</li>
+   <li><code>{between,Low,High}</code> between low (inclusive) and high (inclusive)</li>
+   <li><code>{textsearch,Term}</code>  Lucene text search</li>
+   <li><code>{in,[Val1,...,ValN]}</code>  value is in given list</li>
   </ul>
  
   The comparison operators can be used on any field type including

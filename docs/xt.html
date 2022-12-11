@@ -10,20 +10,37 @@
 <hr>
 
 <h1>Module xt</h1>
-<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>The main API namespace for using XTDB.
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>The main application and API namespace for using XTDB.
 
 
-<h2><a name="description">Description</a></h2>The main API namespace for using XTDB.
+<h2><a name="description">Description</a></h2>The main application and API namespace for using XTDB.
 <h2><a name="index">Function Index</a></h2>
-<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#put-1">put/1</a></td><td>Put a new document into the database.</td></tr>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#init-1">init/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#monitor_xtdb-2">monitor_xtdb/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#put-1">put/1</a></td><td>Put a new document into the database.</td></tr>
 <tr><td valign="top"><a href="#q-2">q/2</a></td><td></td></tr>
 <tr><td valign="top"><a href="#q-3">q/3</a></td><td></td></tr>
 <tr><td valign="top"><a href="#ql-1">ql/1</a></td><td>Query Like record instances.</td></tr>
 <tr><td valign="top"><a href="#ql-2">ql/2</a></td><td>Query Like record instances with options.</td></tr>
+<tr><td valign="top"><a href="#register_xtdb_node-1">register_xtdb_node/1</a></td><td>Add a new XTDB node.</td></tr>
+<tr><td valign="top"><a href="#start-2">start/2</a></td><td></td></tr>
 <tr><td valign="top"><a href="#status-0">status/0</a></td><td>Return XTDB node status information.</td></tr>
+<tr><td valign="top"><a href="#stop-1">stop/1</a></td><td></td></tr>
 </table>
 
 <h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="init-1">init/1</a></h3>
+<div class="spec">
+<p><tt>init(Nodes) -&gt; any()</tt></p>
+<p> </p>
+</div>
+
+<h3 class="function"><a name="monitor_xtdb-2">monitor_xtdb/2</a></h3>
+<div class="spec">
+<p><tt>monitor_xtdb(Parent, Node) -&gt; any()</tt></p>
+<p> </p>
+</div>
 
 <h3 class="function"><a name="put-1">put/1</a></h3>
 <div class="spec">
@@ -66,11 +83,29 @@
   </dl></p>
 <p><b>See also:</b> <a href="xt_mapping.html#qlike-2">xt_mapping:qlike/2</a>.</p>
 
+<h3 class="function"><a name="register_xtdb_node-1">register_xtdb_node/1</a></h3>
+<div class="spec">
+<p><tt>register_xtdb_node(Node::{atom(), atom()}) -&gt; ok</tt><br></p>
+<p> </p>
+</div><p>Add a new XTDB node</p>
+
+<h3 class="function"><a name="start-2">start/2</a></h3>
+<div class="spec">
+<p><tt>start(Type, Args) -&gt; any()</tt></p>
+<p> </p>
+</div>
+
 <h3 class="function"><a name="status-0">status/0</a></h3>
 <div class="spec">
 <p><tt>status() -&gt; map()</tt><br></p>
 <p> </p>
 </div><p>Return XTDB node status information.</p>
+
+<h3 class="function"><a name="stop-1">stop/1</a></h3>
+<div class="spec">
+<p><tt>stop(X) -&gt; any()</tt></p>
+<p> </p>
+</div>
 <hr>
 
 <div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
