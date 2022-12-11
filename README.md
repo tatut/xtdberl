@@ -92,10 +92,10 @@ The supported operators are:
 
 | Tuple | Description |
 | ----- | ----------- |
-| `{'&lt;', Val}` |  attr has value less than Val |
-| `{'&lt;=', Val}` | attr has value less than or equal to Val |
-| `{'&gt;', Val}` | attr has value greater than Val |
-| `{'&gt;=', Val}` |  attr has value greater than or equal to Val |
+| `{'<', Val}` |  attr has value less than Val |
+| `{'<=', Val}` | attr has value less than or equal to Val |
+| `{'>', Val}` | attr has value greater than Val |
+| `{'>=', Val}` |  attr has value greater than or equal to Val |
 | `{between,Low,High}` | attr value is between low (inclusive) and high (inclusive) |
 | `{textsearch,Term}` | attr value matches Lucene text search pattern Term |
 | `{in,[Val1,...,ValN]}` | attr value is one of the Val1,...,ValN options |
