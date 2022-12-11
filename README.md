@@ -78,6 +78,30 @@ ok
 You can browse what is stored in the XTDB database using the included inspector.
 Just open a web browser to [http://localhost:3000/tx](http://localhost:3000/tx).
 
+## Query support
+
+The library supports sending raw Datalog queries to XTDB and a higher level
+mapping from Erlang records to XTDB documents.
+
+Erlang records are queried with the `xt:ql` function by giving it a candidate
+instance. The query will return all instances that match the given candidate.
+The candidate field values can be direct values (eg. numbers, strings, dates and
+so on) or tuples that describe finer grained query operators.
+
+The supported operators are:
+
+| Tuple | Description |
+| ----- | ----------- |
+| `{'&lt;', Val}` |  attr has value less than Val |
+| `{'&lt;=', Val}` | attr has value less than or equal to Val |
+| `{'&gt;', Val}` | attr has value greater than Val |
+| `{'&gt;=', Val}` |  attr has value greater than or equal to Val |
+| `{between,Low,High}` | attr value is between low (inclusive) and high (inclusive) |
+| `{textsearch,Term}` | attr value matches Lucene text search pattern Term |
+| `{in,[Val1,...,ValN]}` | attr value is one of the Val1,...,ValN options |
+
+Querying is done by provide
+
 ## Build the library
 
     $ rebar3 compile

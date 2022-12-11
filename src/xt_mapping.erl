@@ -284,7 +284,7 @@ where_in(WhereIn0, Candidate, Mapping) ->
 %%  <li><code>{'&lt;=', Val}</code> less than or equals</li>
 %%  <li><code>{'&gt;', Val}</code> greater than</li>
 %%  <li><code>{'&gt;=', Val}</code> greater than or equals</li>
-%%  <li><code>{between,Low,High}</code> between low (inclusive) and high (inclusive)
+%%  <li><code>{between,Low,High}</code> between low (inclusive) and high (inclusive)</li>
 %%  <li><code>{textsearch,Term}</code>  Lucene text search</li>
 %%  <li><code>{in,[Val1,...,ValN]}</code>  value is in given list</li>
 %% </ul>
