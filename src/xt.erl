@@ -153,8 +153,7 @@ status() ->
 %% @see xt_mapping:register/1.
 %% @see xt_mapping:qlike/2.
 ql(Candidate) when is_tuple(Candidate) ->
-    RecordType = element(1, Candidate),
-    ql(Candidate,[{mapping, xt_mapping:get(RecordType)}]).
+    ql(Candidate,[]).
 
 -spec ql(tuple(), [{atom(),any()}]) -> [tuple()].
 %% @doc Query Like record instances with options.
@@ -164,9 +163,18 @@ ql(Candidate) when is_tuple(Candidate) ->
 %% </dl>
 %% @see xt_mapping:qlike/2.
 ql(Candidate,Options) when is_tuple(Candidate) ->
-    Mapping = orddict:fetch(mapping, Options),
+    RecordType = element(1,Candidate),
+    Mapping = case orddict:find(mapping, Options) of
+                  {ok, M} -> M;
+                  error -> xt_mapping:get(RecordType)
+              end,
     {Query,Where,In} = xt_mapping:qlike(Candidate, Mapping),
     case q(Query,Where,In) of
         {ok, Results} -> xt_mapping:read_results(Results, Mapping);
         timeout -> timeout
     end.
+
+%% project with fetch
+%%ql(#person{first_name={'>', "A"}},
+%%   [{fetch, [#person.first_name, #person.last_name,
+%%             {#person.address, [#address.country]}]}]

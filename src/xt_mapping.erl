@@ -220,12 +220,23 @@ qlike_textsearch(Attr, Term, {Where,In}) ->
     {Where ++ [[{'text-search', Attr, NextParam}, [[qlike]]]],
      [{NextParam, Term} | In]}.
 
+qlike_between(Attr, Low, High, {Where, In}) ->
+    NextWhere = next_where(Where),
+    NextParam = next_param(In),
+    LowParam = list_to_atom(atom_to_list(NextParam) ++ "lo"),
+    HighParam = list_to_atom(atom_to_list(NextParam) ++ "hi"),
+    {Where ++ [[qlike, Attr, NextWhere],
+               [{'>=', NextWhere, LowParam}],
+               [{'<=', NextWhere, HighParam}]],
+     [{LowParam, Low}, {HighParam, High} | In]}.
+
 qlike_where(Attr, Conv, Val, WhereIn) ->
     case Val of
         {'<', Val1} -> qlike_op('<', Attr, conv(Conv, Val1), WhereIn);
         {'<=', Val1} -> qlike_op('<', Attr, conv(Conv,Val1), WhereIn);
         {'>', Val1} -> qlike_op('>', Attr, conv(Conv, Val1), WhereIn);
         {'>=', Val1} -> qlike_op('>=', Attr, conv(Conv, Val1), WhereIn);
+        {'between', Low, High} -> qlike_between(Attr, conv(Conv,Low), conv(Conv,High), WhereIn);
         {'textsearch', Term} -> qlike_textsearch(Attr, conv(Conv,Term), WhereIn);
         _ -> qlike_eq(Attr, conv(Conv,Val), WhereIn)
     end.
@@ -259,14 +270,15 @@ where_in(WhereIn0, Candidate, Mapping) ->
       WhereIn0, Mapping#mapping.fields).
 
 %% @doc Generate a query to search instances matching a candidate record.
-%% Record values may be direct values to match or tuples containing {op, Val}
+%% Record values may be direct values to match or tuples containing {op, ...args}
 %% where op is one of the supported operations:
 %% <ul>
-%%  <li><code>&lt;</code> less than</li>
-%%  <li><code>&lt;=</code> less than or equals</li>
-%%  <li><code>&gt;</code> greater than</li>
-%%  <li><code>&gt;=</code> greater than or equals</li>
-%%  <li><code>textsearch</code>  Lucene text search</li>
+%%  <li><code>{'&lt;', Val}</code> less than</li>
+%%  <li><code>{'&lt;=', Val}</code> less than or equals</li>
+%%  <li><code>{'&gt;', Val}</code> greater than</li>
+%%  <li><code>{'&gt;=', Val}</code> greater than or equals</li>
+%%  <li><code>{between,Low,High}</code> between low (inclusive) and high (inclusive)
+%%  <li><code>{textsearch,Term}</code>  Lucene text search</li>
 %% </ul>
 %%
 %% The comparison operators can be used on any field type including

@@ -50,7 +50,9 @@ person(Id,Fn,Ln,Email,Dob,Billing,Shipping) ->
 
 
 init() ->
-    register_mappings(),
+    register_mappings().
+
+add_data() ->
     xt:put(
       [#person{person_id="01234-abc",
                first_name="Max", last_name="Feedpressure",

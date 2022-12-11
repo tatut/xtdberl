@@ -43,11 +43,14 @@ Then you can use the library in the Erlang shell:
 ```erlang
 
 %% Register mappings and add some example data
-1> xt_demo:init().
+> xt_demo:init().
 ok
 
+> xt_demo:add_data().
+{ok,...}
+
 %% Define records in shell for easy access
-2> rr(xt_demo).
+> rr(xt_demo).
 [address,person]
 
 %% Use qlike to query
@@ -60,11 +63,11 @@ ok
                                     city = "Stockholm",zip = "666123",country = ':SE'}}]
 
 %% Add new person
-4> xt:put(#person{person_id="demo1", first_name="Donna", last_name="Demonstration"}).
+> xt:put(#person{person_id="demo1", first_name="Donna", last_name="Demonstration"}).
 {ok,...}
 
 %% Query also works by id
-5> xt:ql(#person{person_id="demo1"})
+> xt:ql(#person{person_id="demo1"})
 [#person{person_id = "demo1",first_name = "Donna",
          last_name = "Demonstration",email = undefined,
          date_of_birth = undefined,shipping_address = undefined,
