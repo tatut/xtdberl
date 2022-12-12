@@ -168,7 +168,7 @@ ql(Candidate,Options) when is_tuple(Candidate) ->
                   {ok, M} -> M;
                   error -> xt_mapping:get(RecordType)
               end,
-    {Query,Where,In} = xt_mapping:qlike(Candidate, Mapping),
+    {Query,Where,In} = xt_mapping:qlike(Candidate, Mapping, Options),
     case q(Query,Where,In) of
         {ok, Results} -> xt_mapping:read_results(Results, Mapping);
         timeout -> timeout

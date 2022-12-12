@@ -13,7 +13,7 @@
 
          %% Support for querying by records
          attributes/1,
-         qlike/2, read_results/2]).
+         qlike/3, read_results/2]).
 -include("xt_mapping.hrl").
 
 %% Maybe run value through conversion function
@@ -294,10 +294,33 @@ where_in(WhereIn0, Candidate, Mapping) ->
 %% it is better to the <code>textsearch</code> operator.
 %% Returns a tuple containing the datalog query {Find, Where, In}.
 %% @see xt_lucene
-qlike(Candidate, Mapping) ->
+qlike(Candidate, Mapping, Options) ->
     {Where,In} = where_in({[],[]}, Candidate, Mapping),
-    Find = [[pull,qlike,attributes(Mapping)]],
-    {Find, Where, In}.
+    Find = [[pull,qlike,
+             case orddict:find(fetch, Options) of
+                 error -> attributes(Mapping);
+                 {ok, Fetch} -> fetch(Mapping, Fetch, [':xt/id'])
+             end]],
+    R = {Find, Where, In},
+    %%io:format("qlike QUERY: ~p~n", [R]),
+    R.
 
 read_results(Results, Mapping) ->
     [to_rec(R, Mapping) || [R] <- Results].
+
+mapping_for(Mapping, Field) ->
+    case lists:search(fun(#field{field=F1}) when F1 == Field -> true;
+                         (#embed{field=F1}) when F1 == Field -> true;
+                         (_) -> false end,
+                      Mapping#mapping.fields) of
+        {value, Fm} -> Fm;
+        false -> throw({no_field_mapping_for, Field, in, Mapping})
+    end.
+
+fetch(_, [], Acc) -> Acc;
+fetch(M, [F|Fields], Acc) when is_integer(F) ->
+    #field{attr=Attr} = mapping_for(M, F),
+    fetch(M, Fields, [Attr | Acc]);
+fetch(M, [{Embed,EmbedFields}|Fields], Acc) ->
+    #embed{mapping = EmbedMapping} = mapping_for(M, Embed),
+    fetch(M, Fields, fetch(EmbedMapping, EmbedFields, Acc)).

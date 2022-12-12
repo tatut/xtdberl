@@ -118,6 +118,39 @@ The supported operators are:
 By default all attributes that have a mapping will be pulled when querying
 instances. Support for restricting fetched attributes is coming soon!
 
+## Selecting partial data
+
+The default mode is to fetch all fields that have a mapping from the database. Sometimes you would
+to reduce the amount of data that needs to be fetched to optimize the
+query and network load.
+
+This can be done by passing in the `fetch` option to `xt:ql/2`.
+Fetch takes a list of field references and only fetches those.
+Fields in embedded records can be specified using a tuple `{#parent.child_field, [#child.field1, ...]}`.
+
+Example:
+```erlang
+%% Fetch person name and city and zip of billing address for all
+%% people whose  billing address is in Finland
+> xt:ql(#person{billing_address=#address{country=':FI'}},
+        [{fetch, [#person.first_name, #person.last_name,
+                  {#person.billing_address, [#address.city, #address.zip]}]}]).
+[#person{person_id = "234234-444",first_name = "Matti",
+         last_name = "Korhonen",email = undefined,
+         date_of_birth = undefined,shipping_address = undefined,
+         billing_address = #address{street = undefined,city = "Oulu",
+                                    zip = "90100",country = undefined}},
+ #person{person_id = "42069-xxx",first_name = "Foo",
+         last_name = "Barsky",email = undefined,
+         date_of_birth = undefined,shipping_address = undefined,
+         billing_address = #address{street = undefined,city = "Oulu",
+                                    zip = "90420",country = undefined}}]
+```
+
+Not that even with fetch, the query will still return records but
+all the unfetched fields will be undefined. The document id will
+always be fetched even if it isn't specified.
+
 ## Build the library
 
     $ rebar3 compile

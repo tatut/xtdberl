@@ -29,6 +29,7 @@
     (let [;; Convert tuples to lists (for operation calls)
           query (term/unwrap-tuples query #(apply list %))
           _ (def *q query)
+          _ (def *xtdb xtdb)
           result (apply xt/q (xt/db xtdb) query args)]
 
       (send! mbox from-pid 'ok query-id result))
@@ -37,7 +38,6 @@
       (send! mbox from-pid 'error query-id (ex-data e)))))
 
 (defmethod handle 'put [xtdb mbox [_ from-pid msg-id & docs]]
-  (def *docs docs)
   (try
     (let [{::xt/keys [tx-id tx-time]}
           (xt/submit-tx xtdb
@@ -64,18 +64,15 @@
             (try
               (->clj (.receive mbox))
               (catch Throwable t
-                (println "ERROR converting received to clj data: " t))))]
+                (log/warn t "ERROR converting received to clj data"))))]
     (loop [msg (recv)]
-      (println "Received " msg)
-      (def *msg msg)
+      (log/debug "Received: " msg)
       (.submit executor-service
                ^Runnable #(try
                             (if (term/tuple? msg)
                               (handle xtdb mbox (:elements msg))
                               (log/warn "Received unrecognized message, ignoring: " msg))
                             (catch Throwable t
-                              (println "thrown: " t)
-                              (def *t t)
                               (log/warn t "Exception in message handler, msg: " msg))))
       (recur (recv)))))
 
