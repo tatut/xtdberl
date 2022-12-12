@@ -198,3 +198,11 @@
         most (.getLong bb)
         least (.getLong bb)]
     (java.util.UUID. most least)))
+
+(defn orddict->map
+  "Convert an orddict of [{atom(),any()}] to a Clojure keyword map."
+  [items]
+  (into {}
+        (map (fn [{[key value] :elements}]
+               [(keyword key) value]))
+        items))

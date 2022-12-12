@@ -2,7 +2,7 @@
 -module(xt).
 -export([start/2, stop/1, init/1, monitor_xtdb/2,
          register_xtdb_node/1,
-         q/3, q/2, put/1, status/0, ql/1, ql/2]).
+         q/4, q/3, q/2, put/1, status/0, ql/1, ql/2]).
 -include("types.hrl").
 
 %%%%%%%%%%%
@@ -90,10 +90,18 @@ pid() ->
         no_available_xtdb_node -> throw(no_available_xtdb_node)
     end.
 
+supported_q_option({tx_time,_}) -> true;
+supported_q_option({valid_time,_}) -> true;
+supported_q_option({tx_id,_}) -> true;
+supported_q_option(_) -> false.
+
 q(Find, Where) -> q(Find,Where,[]).
-q(Find, Where, In) ->
+q(Find, Where, In) -> q(Find,Where,In,[]).
+q(Find, Where, In, Options) ->
     QueryId = make_ref(),
     pid() ! {q, self(), QueryId,
+             [ Opt || Opt <- Options,
+                      supported_q_option(Opt) ],
              ([':find' | Find] ++ [':where' | Where] ++
                  (case length(In) of
                       0 -> [];
@@ -169,7 +177,7 @@ ql(Candidate,Options) when is_tuple(Candidate) ->
                   error -> xt_mapping:get(RecordType)
               end,
     {Query,Where,In} = xt_mapping:qlike(Candidate, Mapping, Options),
-    case q(Query,Where,In) of
+    case q(Query,Where,In,Options) of
         {ok, Results} -> xt_mapping:read_results(Results, Mapping);
         timeout -> timeout
     end.

@@ -24,13 +24,27 @@
     (def *out msg)
     (.send mbox to msg)))
 
-(defmethod handle 'q [xtdb mbox [_ from-pid query-id query args]]
+(defn- options->db-basis [{:keys [tx_time tx_id valid_time]}]
+  (merge
+   (when valid_time
+     {::xt/valid-time valid_time})
+   (when (or tx_time tx_id)
+     {::xt/tx
+      (merge
+       (when tx_time
+         {::xt/tx-time tx_time})
+       (when tx_id
+         {::xt/tx-id tx_id}))})))
+
+(defmethod handle 'q [xtdb mbox [_ from-pid query-id options query args]]
   (try
     (let [;; Convert tuples to lists (for operation calls)
           query (term/unwrap-tuples query #(apply list %))
           _ (def *q query)
           _ (def *xtdb xtdb)
-          result (apply xt/q (xt/db xtdb) query args)]
+          opts (term/orddict->map options)
+          _ (def *opts opts)
+          result (apply xt/q (xt/db xtdb (options->db-basis opts)) query args)]
 
       (send! mbox from-pid 'ok query-id result))
     (catch Exception e

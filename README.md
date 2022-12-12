@@ -151,6 +151,61 @@ Not that even with fetch, the query will still return records but
 all the unfetched fields will be undefined. The document id will
 always be fetched even if it isn't specified.
 
+## Time travel
+
+As XTDB retains full history of all data, it is possible to query
+by giving a transaction id or time as well as a valid time.
+
+See [XTDB documentation on bitemporality](https://docs.xtdb.com/concepts/bitemporality/).
+
+Use the following options to query:
+
+* `tx_time`  a tuple of `{timestamp, EpochMillis}`
+* `tx_id`    an integer sequnce id for the transaction
+* `valid_time`  a tuple of `{timestamp, EpocMillis}`
+
+Where EpochMillis is the number of milliseconds elapsed since January 1, 1970, 00:00:00 GMT.
+
+Example:
+```erlang
+%% Add a new person, the system reports back tx_id and tx_time
+> xt:put(#person{person_id="time1", first_name="Time", last_name="Traveler"}).
+{ok,{37,{timestamp,1670863315580}}}
+
+%% Querying at the same tx will find it
+> xt:ql(#person{person_id="time1"},[{tx_id,37}]).
+[#person{person_id = "time1",first_name = "Time",
+         last_name = "Traveler",email = undefined,
+         date_of_birth = undefined,shipping_address = undefined,
+         billing_address = undefined}]
+
+%% Querying at any time before the tx it was added, doesn't find it
+> xt:ql(#person{person_id="time1"},[{tx_id,36}]).
+[]
+
+%% Put new version of document
+> xt:put(#person{person_id="time1", first_name="Chrono", last_name="Jumper"}).
+{ok,{38,{timestamp,1670863377972}}}
+
+%% Previous is still present in history
+> xt:ql(#person{person_id="time1"},[{tx_id,37}]).
+[#person{person_id = "time1",first_name = "Time",
+         last_name = "Traveler",email = undefined,
+         date_of_birth = undefined,shipping_address = undefined,
+         billing_address = undefined}]
+
+%% New is the latest one
+> xt:ql(#person{person_id="time1"},[{tx_id,38}]).
+[#person{person_id = "time1",first_name = "Chrono",
+         last_name = "Jumper",email = undefined,
+         date_of_birth = undefined,shipping_address = undefined,
+         billing_address = undefined}]
+```
+
+You can use either `tx_time` or `tx_id` to query. Not that you can't request a
+tx time that is in the future (the node will report that it isn't synced up to
+that point in time). You can query with a `valid_time` in the future.
+
 ## Build the library
 
     $ rebar3 compile
@@ -164,7 +219,12 @@ The database node acts as an Erlang named process that accepts queries and comma
 
 Here are some planned features:
 
-* Projection (pull only some fields)
+* ~~Partial fetch (pull only some fields)~~
 * Query ids and pull by ids (for doing fine grained pagination things)
 * Batching results (send results back by messages of wanted size)
 * Mapping for linked documents (query and pull them)
+* ~~Time travel (options to set tx time and valid time)~~
+* `put` options for valid_time
+* `delete` tx
+* `match` tx
+* `evict` tx
