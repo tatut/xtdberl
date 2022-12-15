@@ -84,3 +84,17 @@ add_data() ->
                billing_address=#address{street = "Svensk gatan 6",
                                         city = "Stockholm", zip="666123",
                                         country = ':SE'}}]).
+
+add_many() ->
+    %% add lots of persons with only a name to test paging
+    xt:put(
+      [#person{person_id="test"++integer_to_list(I),
+               first_name="Paging"++integer_to_list(I),
+               last_name=integer_to_list(1000-I)++" Test"} ||
+          I <- lists:seq(1, 1000)]).
+
+page(N, Size) ->
+    xt:ql(#person{first_name={between, "Paging", "Q"}},
+          [{order_by, [{#person.first_name,asc}]},
+           {offset, N*Size},
+           {limit, Size}]).

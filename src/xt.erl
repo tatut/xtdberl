@@ -2,7 +2,7 @@
 -module(xt).
 -export([start/2, stop/1, init/1, monitor_xtdb/2,
          register_xtdb_node/1,
-         q/4, q/3, q/2, put/1, status/0, ql/1, ql/2]).
+         q/1, put/1, status/0, ql/1, ql/2]).
 -include("types.hrl").
 
 %%%%%%%%%%%
@@ -10,7 +10,7 @@
 
 start(Type, Args) ->
     io:format("START ~p ~p~n", [Type,Args]),
-    Nodes = orddict:fetch(xtdb_nodes,Args),
+    {xtdb_nodes, Nodes} = lists:keyfind(xtdb_nodes, 1, Args),
     logger:info("Starting XTDB interface with ~p node(s)",[length(Nodes)]),
     Pid = spawn(?MODULE, init, [Nodes]),
     register(xtdb, Pid),
@@ -95,19 +95,55 @@ supported_q_option({valid_time,_}) -> true;
 supported_q_option({tx_id,_}) -> true;
 supported_q_option(_) -> false.
 
-q(Find, Where) -> q(Find,Where,[]).
-q(Find, Where, In) -> q(Find,Where,In,[]).
-q(Find, Where, In, Options) ->
+build_opts({Key,Val}=Opt, O) ->
+    case supported_q_option(Opt) of
+        true -> maps:put(Key, Val, O);
+        false -> O
+    end.
+
+-spec build_q(tuple(), #{}) -> #{}.
+build_q({find, Find}, Q) ->
+    maps:put(':find', Find, Q);
+build_q({where, Where}, Q) ->
+    maps:put(':where', Where, Q);
+build_q({in, In}, Q) ->
+    maps:put(':in', [K || {K,_} <- In], Q);
+build_q({limit, N}, Q) ->
+    maps:put(':limit', N, Q);
+build_q({offset, N}, Q) ->
+    maps:put(':offset', N, Q);
+build_q({order_by, FieldsAndDirections}, Q) ->
+    maps:put(':order-by', FieldsAndDirections, Q);
+build_q(Option, Q) ->
+    case supported_q_option(Option) of
+        %% Skip any other supported query options
+        %% that are not a part of the query map itself
+        true -> Q;
+        false -> throw({unrecognized_query_option, Option})
+    end.
+
+build_args(Options) ->
+    {in, In} = lists:keyfind(in, 1, Options),
+    [V || {_,V} <- In].
+
+
+ensure_args(Opts) ->
+    case lists:keyfind(in, 1, Opts) of
+        false -> [{in,[]} | Opts];
+        {in,_} -> Opts
+    end.
+
+-spec q([tuple()]) -> [any()]. % more detailed spec
+q(QueryAndOptions0) ->
+    QueryAndOptions = ensure_args(QueryAndOptions0),
+    Query = lists:foldl(fun build_q/2, #{}, QueryAndOptions),
+    Opts = lists:foldl(fun build_opts/2, #{}, QueryAndOptions),
+    Args = build_args(QueryAndOptions),
+    %%io:format("QUERY: ~p, HAS ARGS: ~p~n", [Query,Args]),
     QueryId = make_ref(),
-    pid() ! {q, self(), QueryId,
-             [ Opt || Opt <- Options,
-                      supported_q_option(Opt) ],
-             ([':find' | Find] ++ [':where' | Where] ++
-                 (case length(In) of
-                      0 -> [];
-                      _ -> [':in' | [K || {K,_} <- In]]
-                  end)),
-             [V || {_,V} <- In]},
+
+    %% Send the query
+    pid() ! {q, self(), QueryId, Opts, Query, Args },
 
     receive
         {ok, QueryId, Results} -> {ok, Results};
@@ -116,6 +152,8 @@ q(Find, Where, In, Options) ->
     after 30000 -> %% configure as options
             timeout
     end.
+
+
 
 -spec put(doclike() | [doclike()]) -> {ok, #txinfo{}} | {error, any()}.
 
@@ -172,12 +210,12 @@ ql(Candidate) when is_tuple(Candidate) ->
 %% @see xt_mapping:qlike/2.
 ql(Candidate,Options) when is_tuple(Candidate) ->
     RecordType = element(1,Candidate),
-    Mapping = case orddict:find(mapping, Options) of
-                  {ok, M} -> M;
-                  error -> xt_mapping:get(RecordType)
+    Mapping = case lists:keyfind(mapping, 1, Options) of
+                  false -> xt_mapping:get(RecordType);
+                  {mapping, M} -> M
               end,
-    {Query,Where,In} = xt_mapping:qlike(Candidate, Mapping, Options),
-    case q(Query,Where,In,Options) of
+    QueryOptions  = xt_mapping:qlike(Candidate, Mapping, Options),
+    case q(QueryOptions) of
         {ok, Results} -> xt_mapping:read_results(Results, Mapping);
         timeout -> timeout
     end.

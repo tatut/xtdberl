@@ -292,21 +292,60 @@ where_in(WhereIn0, Candidate, Mapping) ->
 %% The comparison operators can be used on any field type including
 %% numbers, strings, dates and so on. But for better text searching
 %% it is better to the <code>textsearch</code> operator.
-%% Returns a tuple containing the datalog query {Find, Where, In}.
+%% Returns a list containing options for `xt:q/1` query.
+%%
+%% Supports order_by option that uses the mapping. Other options
+%% are passed through as is.
+%%
 %% @see xt_lucene
-qlike(Candidate, Mapping, Options) ->
-    {Where,In} = where_in({[],[]}, Candidate, Mapping),
-    Find = [[pull,qlike,
-             case orddict:find(fetch, Options) of
-                 error -> attributes(Mapping);
-                 {ok, Fetch} -> fetch(Mapping, Fetch, [':xt/id'])
-             end]],
-    R = {Find, Where, In},
-    %%io:format("qlike QUERY: ~p~n", [R]),
-    R.
+qlike(Candidate, Mapping, OptionList) ->
+    Options1 = orddict:from_list(OptionList),
+    {Where0,In} = where_in({[],[]}, Candidate, Mapping),
+    Find0 = [[pull,qlike,
+              case orddict:find(fetch, Options1) of
+                  error -> attributes(Mapping);
+                  {ok, Fetch} -> fetch(Mapping, Fetch, [':xt/id'])
+              end]],
+    {Find, Where, Options2} =
+        case orddict:is_key(order_by, Options1) of
+            true -> add_order(Mapping, Find0, Where0, Options1);
+            false -> {Find0, Where0, Options1}
+        end,
+    lists:foldl(fun({Key, Value}, Opts) ->
+                        orddict:store(Key, Value, Opts) end,
+                Options2,
+                [{find, Find},
+                 {where, Where},
+                 {in, In}]).
+
+find_attr(#mapping{fields=Fields}, Field) ->
+    find_attr(Fields, Field);
+find_attr([#field{field = Field, attr = Attr}|_], Field) -> Attr;
+find_attr([_|Fields], Field) -> find_attr(Fields, Field);
+find_attr(_, Field) -> throw({no_attr_for_field, Field}).
+
+%% FIXME: support embedded records in where
+add_order(Mapping, Find0, Where0, Options) ->
+    Order0 = orddict:fetch(order_by, Options),
+    %%io:format("order0 ~p~n", [Order0]),
+    {FindOut, WhereOut, Order} =
+        lists:foldl(
+          fun(I, {Find, Where, Order}) ->
+                  {Field, Dir} = lists:nth(I, Order0),
+                  Name = list_to_atom("_o"++integer_to_list(I)),
+                  {Find ++ [Name],
+                   Where ++ [[qlike, find_attr(Mapping, Field), Name]],
+                   Order ++ [[Name, case Dir of
+                                        asc -> ':asc';
+                                        desc -> ':desc' end]]}
+          end,
+          {Find0, Where0, []},
+         lists:seq(1, length(Order0))),
+    OptionsOut = orddict:store(order_by, Order, Options),
+    {FindOut, WhereOut, OptionsOut}.
 
 read_results(Results, Mapping) ->
-    [to_rec(R, Mapping) || [R] <- Results].
+    [to_rec(hd(R), Mapping) || R <- Results].
 
 mapping_for(Mapping, Field) ->
     case lists:search(fun(#field{field=F1}) when F1 == Field -> true;
