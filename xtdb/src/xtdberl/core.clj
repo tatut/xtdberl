@@ -36,7 +36,8 @@
        (when tx_id
          {::xt/tx-id tx_id}))})))
 
-(defmethod handle 'q [xtdb mbox [_ from-pid query-id options query args]]
+(defmethod handle 'q [xtdb mbox [_ from-pid query-id options query args :as msg]]
+  (def *msg msg)
   (try
     (let [;; Convert tuples to lists (for operation calls)
           query (term/unwrap-tuples query #(apply list %))
@@ -51,16 +52,22 @@
       (log/warn e "Error in query")
       (send! mbox from-pid 'error query-id (ex-data e)))))
 
-(defmethod handle 'put [xtdb mbox [_ from-pid msg-id & docs]]
+(defmulti tx-ops (fn [cmd _args] cmd))
+
+(defmethod tx-ops 'put [_ docs]
+  (for [d (term/unwrap-tuples docs)]
+    [::xt/put (if (map? d)
+                ;; Use map directly
+                d
+                ;; Turn orddict into a map
+                (into {} d))]))
+
+(defmethod handle 'put [xtdb mbox [_ from-pid msg-id docs :as put]]
+  (def *put put)
   (try
     (let [{::xt/keys [tx-id tx-time]}
           (xt/submit-tx xtdb
-                        (for [d (term/unwrap-tuples docs)]
-                          [::xt/put (if (map? d)
-                                      ;; Use map directly
-                                      d
-                                      ;; Turn orddict into a map
-                                      (into {} d))]))]
+                        (tx-ops 'put docs))]
       (send! mbox from-pid
              'ok msg-id (term/tuple tx-id tx-time)))
     (catch Exception e
@@ -69,6 +76,16 @@
 
 (defmethod handle 'status [xtdb mbox [_ from-pid msg-id]]
   (send! mbox from-pid 'ok msg-id (xt/status xtdb)))
+
+(defmethod handle 'batch [xtdb mbox [_ from-pid msg-id ops :as msg]]
+  (def *batch msg)
+  (let [{::xt/keys [tx-id tx-time] :as res}
+        (xt/submit-tx xtdb
+                      (mapcat (fn [{[type args] :elements}]
+                                (tx-ops type args))
+                              ops))]
+    (log/debug "Batch op done: " res)
+    (send! mbox from-pid 'ok msg-id (term/tuple tx-id tx-time))))
 
 (defn- server-loop
   "Main server loop, reads commands and dispatches them to executor pool."

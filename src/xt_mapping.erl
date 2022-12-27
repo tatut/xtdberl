@@ -21,51 +21,93 @@
 conv(undefined, Val) -> Val;
 conv(Fun, Val) ->  Fun(Val).
 
-%% @doc Convert Erlang record tuple to an XTDB document map using mapping
--spec to_doc(tuple(), #mapping{}) -> #{atom() => any()}.
-to_doc(Record, #mapping{fields = Fields}) ->
-    lists:foldl(fun(#field{attr=Name,field=Field,to_xtdb=Conv,required=Req}, Doc) ->
-                        case conv(Conv, element(Field, Record)) of
-                            undefined ->
-                                if Req -> throw({required_field_missing, Field, attr, Name});
-                                   true -> Doc
-                                end;
-                            Val -> maps:put(Name, Val, Doc)
-                        end;
-                   (#conversion{record_to_xtdb=Write}, Doc) -> Write(Record, Doc);
-                   (#embed{field=Field, mapping=EmbedMapping}, Doc) ->
-                        case element(Field, Record) of
-                            undefined -> Doc;
-                            E -> maps:merge(Doc, to_doc(E, EmbedMapping))
-                        end;
-                   (#static{attr=Attr,value=Val}, Doc) ->
-                           maps:put(Attr, Val, Doc)
-                end,
-                #{}, Fields).
 
-%% @doc Convert an XTDB document map (as gotten by pull) to an Erlang record tuple using mapping
+%% Abstract over Erlang record and Elixir struct differences:
+%% - get_value/2  gets value (either from record or struct)
+%% - set_value/3  sets value into record tuple or struct map
+%% - undefined_value/1  determines wether to use undefined/nil as the "missing" value
+
+get_value(#field{field=Field,key=undefined}, Record) -> element(Field, Record);
+get_value(#field{field=undefined,key=Key}, Struct) -> maps:get(Key, Struct);
+get_value(#embed{field=Field,key=undefined}, Record) -> element(Field, Record);
+get_value(#embed{field=undefined,key=Key}, Struct) -> maps:get(Key, Struct);
+get_value(Field, Record) when is_integer(Field) andalso is_tuple(Record) ->
+    element(Field, Record);
+get_value(Key, Struct) when is_atom(Key) andalso is_map(Struct) ->
+    maps:get(Key, Struct).
+
+set_value(#field{field=Field,key=undefined}, Val, Record) ->
+    setelement(Field, Record, Val);
+set_value(#field{field=undefined,key=Key}, Val, Struct) ->
+    maps:put(Key, Val, Struct);
+set_value(#embed{field=Field,key=undefined}, Val, Record) ->
+    setelement(Field, Record, Val);
+set_value(#embed{field=undefined,key=Key}, Val, Struct) ->
+    maps:put(Key, Val, Struct);
+set_value(Field, Val, Record) when is_integer(Field) andalso is_tuple(Record) ->
+    setelement(Field, Record, Val);
+set_value(Key, Val, Struct) when is_atom(Key) andalso is_map(Struct) ->
+    maps:put(Key, Val, Struct).
+
+%% Get undefined value, Erlang uses undefined atom in records
+%% and Elixir structs have nil atom
+undefined_value(#field{field=F,key=K}) ->
+    if K == undefined -> undefined;
+       F == undefined -> nil
+    end;
+undefined_value(N) when is_integer(N) -> undefined;
+undefined_value(K) when is_atom(K) -> nil.
+
+
+%% @doc Convert Erlang record tuple or Elixir struct to an XTDB document map using mapping
+-spec to_doc(tuple() | map(), #mapping{}) -> #{atom() => any()}.
+to_doc(Record, #mapping{fields = Fields}) ->
+    lists:foldl(
+      fun(#field{attr=Name,to_xtdb=Conv,required=Req}=F, Doc) ->
+              case conv(Conv, get_value(F, Record)) of
+                  undefined ->
+                      if Req -> throw({required_field_missing, F});
+                         true -> Doc
+                      end;
+                  Val -> maps:put(Name, Val, Doc)
+              end;
+         (#conversion{record_to_xtdb=Write}, Doc) -> Write(Record, Doc);
+         (#embed{mapping=EmbedMapping}=Embed, Doc) ->
+              case get_value(Embed, Record) of
+                  undefined -> Doc;
+                  E -> maps:merge(Doc, to_doc(E, EmbedMapping))
+              end;
+         (#static{attr=Attr,value=Val}, Doc) ->
+              maps:put(Attr, Val, Doc)
+      end,
+      #{}, Fields).
+
+
+%% @doc Convert an XTDB document map (as gotten by pull) to an Erlang record tuple or Elixir struct using mapping
 -spec to_rec(#{atom() => any()}, #mapping{}) -> tuple().
 to_rec(Doc, #mapping{empty = Empty, fields = Fields}) ->
-    lists:foldl(fun(#field{attr=Name,field=Field,from_xtdb=Conv}, Rec) ->
-                        setelement(Field, Rec, conv(Conv, maps:get(Name, Doc, undefined)));
-                   (#conversion{xtdb_to_record=Read}, Rec) -> Read(Doc,Rec);
-                   (#embed{field=Field, mapping=EmbedMapping}, Rec) ->
-                        case to_rec(Doc, EmbedMapping) of
-                            %% Embedded had no values (same as empty), don't set it
-                            None when None == EmbedMapping#mapping.empty -> Rec;
+    lists:foldl(
+      fun(#field{attr=Name,from_xtdb=Conv}=F, Rec) ->
+              set_value(F, conv(Conv, maps:get(Name, Doc, undefined_value(F))), Rec);
 
-                            %% Embedded had some values
-                            Val -> setelement(Field, Rec, Val)
-                        end;
-                   (#static{}, Rec) -> Rec
+         (#conversion{xtdb_to_record=Read}, Rec) -> Read(Doc,Rec);
+         (#embed{mapping=EmbedMapping}=Embed, Rec) ->
+              case to_rec(Doc, EmbedMapping) of
+                  %% Embedded had no values (same as empty), don't set it
+                  None when None == EmbedMapping#mapping.empty -> Rec;
 
-                end,
-                Empty, Fields).
+                  %% Embedded had some values
+                  Val -> set_value(Embed, Val, Rec)
+              end;
+         (#static{}, Rec) -> Rec
+
+      end,
+      Empty, Fields).
 
 
 %% @doc Create an ':xt/id' mapping for a Field as Key.
--spec idmap(integer(), atom()) -> #conversion{}.
-idmap(Field, Key) ->
+-spec idmap(integer() | atom(), atom()) -> #conversion{}.
+idmap(FieldOrKey, Key) ->
     #conversion{
        attrs = [':xt/id'],
 
@@ -76,54 +118,60 @@ idmap(Field, Key) ->
                        undefined -> Rec;
                        IdMap when is_map(IdMap) ->
                            Id = maps:get(Key, IdMap),
-                           setelement(Field, Rec, Id);
+                           set_value(FieldOrKey, Id, Rec);
                        Else ->
                            logger:warning("Encountered invalid :xt/id value, not a map: ~p", [Else]),
-                           setelement(Field, Rec, Else)
+                           set_value(FieldOrKey, Else, Rec)
                    end
            end,
        %% Write function to set doc :xt/id when creating doc from record
        record_to_xtdb =
            fun(Rec,Doc) ->
-                   case element(Field, Rec) of
-                       undefined -> Doc;
+                   Undef = undefined_value(FieldOrKey),
+                   case get_value(FieldOrKey, Rec) of
+                       Undef -> Doc;
                        Val -> maps:put(':xt/id', #{Key => Val}, Doc)
                    end
            end}.
 
 %% @doc Normal field mapping without any special conversion
-field(Attr, Field) -> field(Attr, Field, undefined, undefined).
+field(Attr, FieldOrKey) -> field(Attr, FieldOrKey, undefined, undefined).
 
 %% @doc Field with special mapping to and from XTDB values.
 %% ToXTDB is called to convert the fields value when sending to XTDB and
 %% FromXTDB is called before setting values received form XTDB to a record.
-field(Attr, Field, ToXTDB, FromXTDB) ->
+field(Attr, FieldOrKey, ToXTDB, FromXTDB) ->
     %% Check that attribute name starts with ':' (clj keywords)
     AttrName = case atom_to_list(Attr) of
                    [$: | _] -> Attr;
                    Name -> list_to_atom([$: | Name])
                end,
-    #field{attr = AttrName, field = Field,
-           to_xtdb = ToXTDB,
-           from_xtdb = FromXTDB}.
+    {Field, Key} = case FieldOrKey of
+                       F when is_integer(F) -> {F, undefined};
+                       K when is_atom(K) -> {undefined, K}
+                   end,
+    #field{attr = AttrName, field = Field, key = Key,
+           to_xtdb = ToXTDB, from_xtdb = FromXTDB}.
 
 %% @doc Create a field that is stored as a local date
-local_date(Attr, Field) ->
-    field(Attr, Field,
-          fun(undefined) -> undefined;
+local_date(Attr, FieldOrKey) ->
+    Undef = undefined_value(FieldOrKey),
+    field(Attr, FieldOrKey,
+          fun(U) when U == Undef -> undefined;
              ({Year,Month,Day}) -> {local_date, Year, Month, Day}
           end,
-          fun(undefined) -> undefined;
+          fun(undefined) -> Undef;
              ({local_date, Year, Month, Day}) -> {Year, Month, Day}
           end).
 
 %% @doc Create a field that is stored as a date and time
-local_datetime(Attr,Field) ->
-    field(Attr, Field,
-          fun(undefined) -> undefined;
+local_datetime(Attr,FieldOrKey) ->
+    Undef = undefined_value(FieldOrKey),
+    field(Attr, FieldOrKey,
+          fun(U) when U == Undef -> undefined;
              ({{Year,Month,Day},{Hour,Minute,Second}}) -> {local_datetime, Year,Month,Day,Hour,Minute,Second}
           end,
-          fun(undefined) -> undefined;
+          fun(undefined) -> Undef;
              ({local_datetime, Y, M, D, H, Mi, S})  ->
                   {{Y,M,D}, {H,Mi,S}}
           end).
@@ -159,13 +207,18 @@ mapping(EmptyRecordValue, FieldMappings) ->
 %% that maps ':address/postal-code' and so on and we embed two records with shipping- and billing-
 %% prefixes, we will get ':shipping-address/postal-code' and ':billing-address/postal-code' attributes
 %% in the document.
--spec embed(#mapping{}, integer()) -> #embed{}.
--spec embed(atom(), #mapping{}, integer()) -> #embed{}.
-embed(Mapping, Field) -> #embed{mapping = Mapping, field = Field}.
-embed(Prefix, #mapping{fields=Fields}=Mapping, Field) ->
+-spec embed(#mapping{}, integer() | atom()) -> #embed{}.
+-spec embed(atom(), #mapping{}, integer() | atom()) -> #embed{}.
+embed(Mapping, FieldOrKey) ->
+    {Field,Key} = case FieldOrKey of
+                      F when is_integer(F) -> {F, undefined};
+                      K when is_atom(K) -> {undefined, K}
+                  end,
+    #embed{mapping = Mapping, field = Field, key = Key}.
+embed(Prefix, #mapping{fields=Fields}=Mapping, FieldOrKey) ->
     embed(Mapping#mapping{
             fields =
-                [ prefix_name(Prefix,F) || F <- Fields ]}, Field).
+                [ prefix_name(Prefix,F) || F <- Fields ]}, FieldOrKey).
 
 prefix_name(Prefix,#field{attr=Attr}=F) ->
     PrefixStr = atom_to_list(Prefix),

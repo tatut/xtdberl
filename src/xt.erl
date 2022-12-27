@@ -2,7 +2,9 @@
 -module(xt).
 -export([start/2, stop/1, init/1, monitor_xtdb/2,
          register_xtdb_node/1,
-         q/1, put/1, status/0, ql/1, ql/2]).
+         q/1, put/1, status/0, ql/1, ql/2,
+         batch/1, batch_handler/2
+        ]).
 -include("types.hrl").
 
 %%%%%%%%%%%
@@ -24,7 +26,7 @@ init(Nodes) ->
     %% Spawn a process that monitors each node
     Me = self(),
     lists:foreach(fun(N) -> spawn(?MODULE, monitor_xtdb, [Me, N]) end, Nodes),
-    loop([]).
+    loop([], #{}).
 
 %% @doc Add a new XTDB node
 -spec register_xtdb_node({atom(), atom()}) -> ok.
@@ -52,13 +54,33 @@ monitor_xtdb(Wait, Parent, {_, Node}=N, PreviousStatus) ->
     end,
     monitor_xtdb(5000, Parent, N, NewStatus).
 
-loop(AvailableNodes) ->
+loop(AvailableNodes, Batches) ->
     receive
         {get_node, From} ->
             case AvailableNodes of
                 [] -> From ! no_available_xtdb_node;
                 [N|_] -> From ! {xtdb_node, N}
-            end;
+            end,
+            loop(AvailableNodes, Batches);
+
+        {get_node_or_batch, From} ->
+            case maps:get(From, Batches, no_batch) of
+                no_batch -> case AvailableNodes of
+                                [] -> From ! no_available_xtdb_node;
+                                [N|_] -> From ! {xtdb_node, N}
+                            end;
+                Batch -> From ! {xtdb_node, Batch}
+            end,
+            loop(AvailableNodes, Batches);
+
+        {batch_start, From} ->
+            Pid = spawn_link(?MODULE, batch_handler, [From,[]]),
+            From ! {batch, Pid},
+            loop(AvailableNodes, maps:put(From, Pid, Batches));
+
+        {batch_done, From} ->
+            loop(AvailableNodes, maps:remove(From, Batches));
+
         {xtdb_up, Node} ->
             %% Add node to available
             logger:info("XTDB node up: ~p", [Node]),
@@ -67,7 +89,8 @@ loop(AvailableNodes) ->
                     logger:notice("1 XTDB node is now available.");
                true -> ok
             end,
-            loop(NewNodes);
+            loop(NewNodes, Batches);
+
         {xtdb_down, Node} ->
             %% Remove node from available
             logger:info("XTDB node down: ~p", [Node]),
@@ -76,17 +99,31 @@ loop(AvailableNodes) ->
                     logger:alert("No XTDB nodes available, subsequent queries and transactions will fail!");
                true -> ok
             end,
-            loop(NewNodes);
+            loop(NewNodes, Batches);
+
         Else ->
-            logger:warning("Unrecognized message received: ~p", [Else])
-    end,
-    loop(AvailableNodes).
+            %% FIXME: handle batch dying
+            logger:warning("Unrecognized message received: ~p", [Else]),
+            loop(AvailableNodes,Batches)
+    end.
+
+
 
 
 pid() ->
     xtdb ! {get_node, self()},
     receive
         {xtdb_node, Node} -> Node;
+        no_available_xtdb_node -> throw(no_available_xtdb_node)
+    end.
+
+%% Returns pid of XTDB process, or a local batch process
+%% if a write batching is in operation
+pid_or_batch() ->
+    xtdb ! {get_node_or_batch, self()},
+    receive
+        {xtdb_node, Node} -> Node;
+        {batch, Batch} -> Batch;
         no_available_xtdb_node -> throw(no_available_xtdb_node)
     end.
 
@@ -173,7 +210,7 @@ doc(Map) when is_map(Map) -> Map.
 %% If document is a list, then multiple documents are put.
 put(Doc) ->
     MsgId = make_ref(),
-    pid() ! list_to_tuple([put, self(), MsgId] ++ doclist(Doc,[])),
+    pid_or_batch() ! {put, self(), MsgId, doclist(Doc,[])},
     receive
         {ok, MsgId, TxInfo} ->
             {ok, TxInfo};
@@ -219,6 +256,62 @@ ql(Candidate,Options) when is_tuple(Candidate) ->
         {ok, Results} -> xt_mapping:read_results(Results, Mapping);
         timeout -> timeout
     end.
+
+
+%% Batch multiple write operations into a single XTDB transaction.
+%% The transaction is sent once the function returns if any operations
+%% were issued by it.
+batch(Fun) ->
+    xtdb ! {batch_start, self()},
+    %%io:format("waiting for batch process pid~n", []),
+    receive
+        {batch, BatchPid} ->
+            %%io:format("got batch process pid ~p ~n", [BatchPid]),
+            Fun(),
+            BatchPid ! {execute, self()},
+            %%io:format("sent batch execute, waiting for results",[]),
+            receive
+                {batch_result, Res} -> {ok, Res}
+            end
+    after 5000 ->
+            logger:warning("Could not start batch withing 5 seconds."),
+            throw(batch_start_timeout)
+    end.
+
+
+
+batch_handler(From, Operations) ->
+    receive
+        {execute, ResultPid} ->
+            BatchId = make_ref(),
+
+            %%io:format("Executing batch with ~p operation~n", [length(Operations)]),
+
+            %% Tell XTDB that we are done with the batch
+            xtdb ! {batch_done, From},
+
+            %% Ask for the XTDB node, send the batch to it
+            xtdb ! {get_node, self()},
+            receive
+                {xtdb_node, XtdbPid} ->
+                    %%io:format("got XTDB node ~p, sending ~n", [XtdbPid]),
+                    XtdbPid ! {batch, self(), BatchId,
+                               lists:reverse(Operations)}
+            end,
+
+            %% Wait for batch TX acknowldgement
+            receive
+                {ok, BatchId, Results} ->
+                    %%io:format("received result from xtdb ~p~n", [Results]),
+                    ResultPid ! {batch_result, Results}
+            end;
+        {put, From, Id, Payload} ->
+            From ! {ok, Id, batched},
+            batch_handler(From, [{put, Payload}|Operations])
+    end.
+
+
+
 
 %% project with fetch
 %%ql(#person{first_name={'>', "A"}},

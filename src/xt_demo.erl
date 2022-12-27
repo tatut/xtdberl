@@ -98,3 +98,14 @@ page(N, Size) ->
           [{order_by, [{#person.first_name,asc}]},
            {offset, N*Size},
            {limit, Size}]).
+
+batch() ->
+    xt:batch(
+      fun() ->
+              xt:put(#person{person_id="batch001",
+                             first_name="Batch123",
+                             last_name = "First batch"}),
+              xt:put(#person{person_id="batch002",
+                             first_name="Batch245",
+                             last_name="Second batch"})
+      end).

@@ -2,7 +2,8 @@
 %% If to_xtdb and from_xtdb are specified, those functions are used to
 %% convert values between domains.
 -record(field, {attr :: atom(),
-                field :: integer(),
+                field :: integer(), %% an Erlang record field (tuple idx)
+                key :: atom(), %% or an atom map key
                 required = false :: boolean(),
                 to_xtdb :: function(),
                 from_xtdb :: function()}).
@@ -18,13 +19,14 @@
 %% @type Defines the mapping from Erlang records to XTDB documents.
 %% The empty tuple value must be specified (eg #myrecord{}) for
 %% some operations to work.
--record(mapping, {empty :: tuple(),
+-record(mapping, {empty :: tuple() | map(),
                   fields :: [ mapping_def() ]}).
 
 -type mapping_def() :: #field{} | #conversion{}.
 
 %% @type Embed mapping
 -record(embed, {field :: integer(),
+                key :: atom(),
                 mapping :: #mapping{}}).
 
 %% @type Static attribute in docs
