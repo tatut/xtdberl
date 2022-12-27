@@ -58,6 +58,10 @@
   (->clj [x]
     (.stringValue x))
 
+  OtpErlangBinary
+  (->clj [x]
+    (String. (.binaryValue x) "UTF-8"))
+
   OtpErlangDouble
   (->clj [x]
     (.doubleValue x))
@@ -117,7 +121,7 @@
 
   String
   (->erl [x]
-    (OtpErlangString. x))
+    (OtpErlangBinary. (.getBytes x "UTF-8")))
 
   Long
   (->erl [x]
