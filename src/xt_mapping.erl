@@ -55,6 +55,10 @@ undefined_value(#field{field=F,key=K}) ->
     if K == undefined -> undefined;
        F == undefined -> nil
     end;
+undefined_value(#embed{field=F,key=K}) ->
+    if K == undefined -> undefined;
+       F == undefined -> nil
+    end;
 undefined_value(N) when is_integer(N) -> undefined;
 undefined_value(K) when is_atom(K) -> nil.
 
@@ -229,13 +233,19 @@ prefix_name(Prefix,#field{attr=Attr}=F) ->
 prefix_name(_,M) -> M.
 
 
+type(Rec) when is_tuple(Rec) ->
+    element(1,Rec);
+type(#{ '__struct__' := Type }) ->
+    Type.
+
+
 %% @doc Register mapping in global registry.
-register(#mapping{empty=Rec}=Mapping) ->
-    persistent_term:put({xt_mapping,element(1,Rec)}, Mapping).
+register(#mapping{empty=Empty}=Mapping) ->
+    persistent_term:put({xt_mapping,type(Empty)}, Mapping).
 
 %% @doc Get a mapping from the global registry.
 get(RecordType) ->
-    persistent_term:get({xt_mapping,RecordType}).
+    persistent_term:get({xt_mapping,type(RecordType)}).
 
 %% @doc Return all XTDB attributes specified in the mapping. Uses an empty record instance.
 attributes(#mapping{fields = Fields}) ->
@@ -303,8 +313,8 @@ qlike_where(Attr, Conv, Val, WhereIn) ->
 
 where_in(WhereIn0, Candidate, Mapping) ->
     lists:foldl(
-      fun(#field{attr=Name,field=Field,to_xtdb=Conv,required=Req}, WhereIn) ->
-              Val = element(Field, Candidate),
+      fun(#field{attr=Name,to_xtdb=Conv,required=Req}=F, WhereIn) ->
+              Val = get_value(F, Candidate),
               case Val of
                   undefined ->
                       if Req -> qlike_req(Name,WhereIn);
@@ -312,9 +322,10 @@ where_in(WhereIn0, Candidate, Mapping) ->
                       end;
                   _ -> qlike_where(Name, Conv, Val, WhereIn)
               end;
-         (#embed{field=Field,mapping=EmbedMapping}, WhereIn) ->
-              case element(Field, Candidate) of
-                  undefined -> WhereIn;
+         (#embed{mapping=EmbedMapping}=Embed, WhereIn) ->
+              Undef = undefined_value(Embed),
+              case get_value(Embed, Candidate) of
+                  U when U == Undef -> WhereIn;
                   EmbedCandidate ->
                       where_in(WhereIn, EmbedCandidate, EmbedMapping)
               end;

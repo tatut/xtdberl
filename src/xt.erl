@@ -235,7 +235,7 @@ status() ->
 %% Requires that a record mapping is registered beforehand.
 %% @see xt_mapping:register/1.
 %% @see xt_mapping:qlike/2.
-ql(Candidate) when is_tuple(Candidate) ->
+ql(Candidate) when is_tuple(Candidate) orelse is_map(Candidate) ->
     ql(Candidate,[]).
 
 -spec ql(tuple(), [{atom(),any()}]) -> [tuple()].
@@ -246,9 +246,8 @@ ql(Candidate) when is_tuple(Candidate) ->
 %% </dl>
 %% @see xt_mapping:qlike/2.
 ql(Candidate,Options) when is_tuple(Candidate) ->
-    RecordType = element(1,Candidate),
     Mapping = case lists:keyfind(mapping, 1, Options) of
-                  false -> xt_mapping:get(RecordType);
+                  false -> xt_mapping:get(Candidate);
                   {mapping, M} -> M
               end,
     QueryOptions  = xt_mapping:qlike(Candidate, Mapping, Options),
