@@ -315,19 +315,18 @@ where_in(WhereIn0, Candidate, Mapping) ->
     lists:foldl(
       fun(#field{attr=Name,to_xtdb=Conv,required=Req}=F, WhereIn) ->
               Val = get_value(F, Candidate),
-              case Val of
-                  undefined ->
+              Undef = undefined_value(F),
+              if Val == Undef ->
                       if Req -> qlike_req(Name,WhereIn);
                          true -> WhereIn
                       end;
-                  _ -> qlike_where(Name, Conv, Val, WhereIn)
+                 true -> qlike_where(Name, Conv, Val, WhereIn)
               end;
          (#embed{mapping=EmbedMapping}=Embed, WhereIn) ->
+              Val = get_value(Embed, Candidate),
               Undef = undefined_value(Embed),
-              case get_value(Embed, Candidate) of
-                  U when U == Undef -> WhereIn;
-                  EmbedCandidate ->
-                      where_in(WhereIn, EmbedCandidate, EmbedMapping)
+              if Val == Undef -> WhereIn;
+                 true -> where_in(WhereIn, Val, EmbedMapping)
               end;
          (#static{attr=Attr,value=Val}, WhereIn) ->
               qlike_eq(Attr, Val, WhereIn);
