@@ -245,7 +245,7 @@ ql(Candidate) when is_tuple(Candidate) orelse is_map(Candidate) ->
 %%   <dt>mapping</dt><dd>the record mapping to use</dd>
 %% </dl>
 %% @see xt_mapping:qlike/2.
-ql(Candidate,Options) when is_tuple(Candidate) ->
+ql(Candidate,Options) when is_tuple(Candidate) orelse is_map(Candidate) ->
     Mapping = case lists:keyfind(mapping, 1, Options) of
                   false -> xt_mapping:get(Candidate);
                   {mapping, M} -> M
