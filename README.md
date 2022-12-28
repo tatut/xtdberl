@@ -9,7 +9,7 @@ Use [XTDB](https://xtdb.com) from Erlang/OTP. Contains Erlang libraries that sen
 The XTDB node uses jinterface to appear like an Erlang process, you send it commands and it responds.
 
 Features:
-- Map Erlang records to XTDB documents
+- Map Erlang records or Elixir structs to XTDB documents
 - Query by giving candidate instances
 - Query by text search and comparison operators
 
@@ -223,6 +223,7 @@ Here are some planned features:
 * Query ids and pull by ids (for doing fine grained pagination things)
 * Batching results (send results back by messages of wanted size)
 * Mapping for linked documents (query and pull them)
+* ~~Batching multiple write operations~~
 * ~~Time travel (options to set tx time and valid time)~~
 * `put` options for valid_time
 * `delete` tx
