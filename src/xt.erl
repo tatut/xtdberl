@@ -130,6 +130,8 @@ pid_or_batch() ->
 supported_q_option({tx_time,_}) -> true;
 supported_q_option({valid_time,_}) -> true;
 supported_q_option({tx_id,_}) -> true;
+supported_q_option({listen,_}) -> true;
+supported_q_option({defer,_}) -> true;
 supported_q_option(_) -> false.
 
 build_opts({Key,Val}=Opt, O) ->
@@ -151,6 +153,8 @@ build_q({offset, N}, Q) ->
     maps:put(':offset', N, Q);
 build_q({order_by, FieldsAndDirections}, Q) ->
     maps:put(':order-by', FieldsAndDirections, Q);
+build_q({defer,_}, Q) -> Q;
+build_q({read_results,_}, Q) -> Q;
 build_q(Option, Q) ->
     case supported_q_option(Option) of
         %% Skip any other supported query options
@@ -179,15 +183,37 @@ q(QueryAndOptions0) ->
     %%io:format("QUERY: ~p, HAS ARGS: ~p~n", [Query,Args]),
     QueryId = make_ref(),
 
-    %% Send the query
-    pid() ! {q, self(), QueryId, Opts, Query, Args },
+    ReadResults = case lists:keyfind(read_results, 1, QueryAndOptions) of
+                      {_, Fun} when is_function(Fun) -> Fun;
+                      false -> fun(R) -> R end
+                  end,
+    case lists:keyfind(defer, 1, QueryAndOptions) of
+        %% Defer query result, send it to another pid instead
+        {defer, DeferToPid} ->
+            spawn(fun() ->
+                          pid() ! {q, self(), QueryId, Opts, Query, Args},
+                          receive
+                              {ok, QueryId, Results} ->
+                                  DeferToPid ! {ok, QueryId, ReadResults(Results)};
+                              {error, QueryId, ErrorInfo} ->
+                                  DeferToPid ! {error, QueryId, ErrorInfo}
+                          after 30000 ->
+                                  DeferToPid ! {timeout, QueryId}
+                          end
+                  end),
+            {deferred, QueryId};
 
-    receive
-        {ok, QueryId, Results} -> {ok, Results};
-        {error, QueryId, ErrorInfo} -> throw(ErrorInfo);
-        Msg -> io:format("Received something else: ~p~n", [Msg]), Msg
-    after 30000 -> %% configure as options
-            timeout
+        %% Send query and receive query result to self
+        false ->
+            %% Send the query
+            pid() ! {q, self(), QueryId, Opts, Query, Args},
+            receive
+                {ok, QueryId, Results} -> ReadResults(Results);
+                {error, QueryId, ErrorInfo} -> throw(ErrorInfo);
+                Msg -> io:format("Received something else: ~p~n", [Msg]), Msg
+            after 30000 -> %% configure as options
+                    timeout
+            end
     end.
 
 
@@ -250,11 +276,10 @@ ql(Candidate,Options) when is_tuple(Candidate) orelse is_map(Candidate) ->
                   false -> xt_mapping:get(Candidate);
                   {mapping, M} -> M
               end,
-    QueryOptions  = xt_mapping:qlike(Candidate, Mapping, Options),
-    case q(QueryOptions) of
-        {ok, Results} -> xt_mapping:read_results(Results, Mapping);
-        timeout -> timeout
-    end.
+    q([{read_results,
+        fun(R) -> xt_mapping:read_results(R,Mapping) end} |
+       xt_mapping:qlike(Candidate, Mapping, Options)]).
+
 
 
 %% Batch multiple write operations into a single XTDB transaction.

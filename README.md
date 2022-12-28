@@ -151,6 +151,20 @@ Not that even with fetch, the query will still return records but
 all the unfetched fields will be undefined. The document id will
 always be fetched even if it isn't specified.
 
+## Async query
+
+The default mode of query is to wait for the results in the process that called
+query function. This can be overridden by using `{defer, Pid}` in the options.
+The query will then return immediately `{deferred, QueryId}` where QueryId is
+a unique reference.
+
+Later the query results are sent to the given pid as a tuple of:
+* `{ok, QueryId, [Results...]}` when success
+* `{error, QueryId, ErrorInfo}` when query fails
+* `{timeout, QueryId}` if query didn't respond within the timeout
+
+
+
 ## Time travel
 
 As XTDB retains full history of all data, it is possible to query
