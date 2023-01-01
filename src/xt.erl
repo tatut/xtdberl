@@ -226,8 +226,11 @@ doclist([D|Docs], Acc) ->
 doclist(X,[]) -> [doc(X)].
 
 doc(Record) when is_tuple(Record) ->
-    xt_mapping:to_doc(Record,
-                      xt_mapping:get(element(1,Record)));
+    %% Erlang record tuple
+    xt_mapping:to_doc(Record, xt_mapping:get(Record));
+doc(#{'__struct__' := _} = Struct) ->
+    %% Elixir struct map
+    xt_mapping:to_doc(Struct, xt_mapping:get(Struct));
 doc(Map) when is_map(Map) -> Map.
 
 %% @doc Put a new document into the database.

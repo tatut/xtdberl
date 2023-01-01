@@ -68,8 +68,9 @@ undefined_value(K) when is_atom(K) -> nil.
 to_doc(Record, #mapping{fields = Fields}) ->
     lists:foldl(
       fun(#field{attr=Name,to_xtdb=Conv,required=Req}=F, Doc) ->
+              Undef = undefined_value(F),
               case conv(Conv, get_value(F, Record)) of
-                  undefined ->
+                  Undef ->
                       if Req -> throw({required_field_missing, F});
                          true -> Doc
                       end;
@@ -77,8 +78,9 @@ to_doc(Record, #mapping{fields = Fields}) ->
               end;
          (#conversion{record_to_xtdb=Write}, Doc) -> Write(Record, Doc);
          (#embed{mapping=EmbedMapping}=Embed, Doc) ->
+              Undef = undefined_value(Embed),
               case get_value(Embed, Record) of
-                  undefined -> Doc;
+                  Undef -> Doc;
                   E -> maps:merge(Doc, to_doc(E, EmbedMapping))
               end;
          (#static{attr=Attr,value=Val}, Doc) ->
