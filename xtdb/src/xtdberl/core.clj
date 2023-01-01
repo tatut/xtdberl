@@ -1,6 +1,7 @@
 (ns xtdberl.core
   (:require [xtdb.api :as xt]
             [xtdberl.term :refer [->erl ->clj] :as term]
+            xtdberl.logging
             [clojure.tools.logging :as log])
   (:import (com.ericsson.otp.erlang
             OtpNode OtpMbox
@@ -152,12 +153,18 @@
   :server  Contains other server configuration
            :workers  how many worker threads to use (default: 20)
 
+  :log-config
+           JUL logging configuration .properties file path
+           (default configuration is used if omitted)
+
   Optional keys:
   :xtdb-inspector
            If present, the XTDB inspector web UI is required and
            started. Configuration map is passed to [[xtdb-inspector.core/start]].
   "
   [config]
+  (xtdberl.logging/configure (:log-config config))
+  (log/info "XTDB/Erlang node starting up")
   (-> config
       (update :xtdb create-xtdb)
       (update :mbox create-mbox)

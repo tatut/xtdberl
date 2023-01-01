@@ -1,0 +1,20 @@
+{;; Configuration given to XTDB start-node
+ :xtdb {:xtdb.lucene/lucene-store {}}
+
+
+
+ ;; Erlang mailbox configuration (nodename, process name)
+ :mbox { ;; The name of the node to use
+        :node "xtdb@localhost"
+
+        ;; The named process name to use
+        :mbox "xtdb"}
+
+ ;; Other server configuration
+ :server {;; How many simultaneous workers to use
+          :workers 20}
+
+ ;; XTDB database inspector web interface
+ ;; Remove this key to disabled
+ :xtdb-inspector {:port 3000}
+ }

@@ -75,8 +75,6 @@
     (zipmap (map ->clj (.keys x))
             (map ->clj (.values x)))))
 
-(declare ->erl)
-
 (defn ^"[Lcom.ericsson.otp.erlang.OtpErlangObject;" otp-array [things]
   (into-array OtpErlangObject (map ->erl things)))
 

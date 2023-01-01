@@ -26,3 +26,4 @@ xtdb/.nrepl-port
 /.clj-kondo/
 /xtdb/.rocksdb/
 /.DS_Store
+/xtdb/uberdeps/.cpcache/

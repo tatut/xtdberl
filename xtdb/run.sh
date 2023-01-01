@@ -2,4 +2,4 @@
 
 CONFIG=${1:-dev}
 
-clj -M:dev:$CONFIG -m xtdberl.main $CONFIG.config.edn
+clj -M:dev:log-jul:$CONFIG -m xtdberl.main $CONFIG.config.edn
