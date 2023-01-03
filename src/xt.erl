@@ -155,6 +155,7 @@ build_q({order_by, FieldsAndDirections}, Q) ->
     maps:put(':order-by', FieldsAndDirections, Q);
 build_q({defer,_}, Q) -> Q;
 build_q({read_results,_}, Q) -> Q;
+build_q({listen,_}, Q) -> Q;
 build_q(Option, Q) ->
     case supported_q_option(Option) of
         %% Skip any other supported query options
@@ -267,7 +268,7 @@ status() ->
 ql(Candidate) when is_tuple(Candidate) orelse is_map(Candidate) ->
     ql(Candidate,[]).
 
--spec ql(tuple(), [{atom(),any()}]) -> [tuple()].
+-spec ql(tuple() | map(), [{atom(),any()}]) -> [tuple()].
 %% @doc Query Like record instances with options.
 %% The supported options are:
 %% <dl>
