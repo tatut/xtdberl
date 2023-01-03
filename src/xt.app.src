@@ -8,10 +8,10 @@
    ]},
   %% Configure where XTDB nodes are located
   {env,[]},
-  {mod,{xt,[{xtdb_nodes,
-             [%% XTDB has a named mailbox at node
-              {xtdb, xtdb@localhost}]}]}},
-  {modules, [xt, xt_mapping, xt_lucene]},
+  {mod,{xt_app,[{xtdb_nodes,
+                 [%% XTDB has a named mailbox at node
+                  {xtdb, xtdb@localhost}]}]}},
+  {modules, [xt_app, xt_supervisor, xt, xt_mapping, xt_lucene]},
   {licenses, []},
   {links, []}
  ]}.

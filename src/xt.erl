@@ -1,6 +1,6 @@
 %% @doc The main application and API namespace for using XTDB.
 -module(xt).
--export([start/2, stop/1, init/1, monitor_xtdb/2,
+-export([start_link/1, stop/1, init/1, monitor_xtdb/2,
          register_xtdb_node/1,
          q/1, put/1, status/0, ql/1, ql/2,
          batch/1, batch_handler/2
@@ -10,8 +10,7 @@
 %%%%%%%%%%%
 % Application lifecycle functions
 
-start(Type, Args) ->
-    io:format("START ~p ~p~n", [Type,Args]),
+start_link(Args) ->
     {xtdb_nodes, Nodes} = lists:keyfind(xtdb_nodes, 1, Args),
     logger:info("Starting XTDB interface with ~p node(s)",[length(Nodes)]),
     Pid = spawn(?MODULE, init, [Nodes]),
@@ -54,6 +53,7 @@ monitor_xtdb(Wait, Parent, {_, Node}=N, PreviousStatus) ->
     end,
     monitor_xtdb(5000, Parent, N, NewStatus).
 
+%% PENDING: turn this into a gen_server
 loop(AvailableNodes, Batches) ->
     receive
         {get_node, From} ->
