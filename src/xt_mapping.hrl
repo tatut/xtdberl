@@ -31,3 +31,22 @@
 
 %% @type Static attribute in docs
 -record(static, {attr :: atom(), value :: any()}).
+
+%% @type Link mapping
+-record(link, {%% XTDB document attribute
+               attr :: atom(),
+
+               %% Record field or struct key
+               field :: integer(), key :: atom(),
+
+               %% Record or struct type of linked document.
+               %% Should be the empty instance.
+               to :: tuple() | map(),
+
+               %% if owned is true, this will be deleted
+               %% when parent is deleted, and pulled by
+               %% default
+               owned = false :: boolean(),
+
+               %% cardinality many or one
+               cardinality :: many | one}).

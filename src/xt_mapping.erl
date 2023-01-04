@@ -10,6 +10,7 @@
          mapping/2, idmap/2, embed/2, embed/3,
          field/2, field/4, local_date/2, local_datetime/2,
          required/1, static/2,
+         link/4, link/5,
 
          %% Support for querying by records
          attributes/1,
@@ -21,6 +22,8 @@
 conv(undefined, Val) -> Val;
 conv(Fun, Val) ->  Fun(Val).
 
+-type rec_or_struct() :: tuple() | map().
+-type field_ref() :: integer() | atom().
 
 %% Abstract over Erlang record and Elixir struct differences:
 %% - get_value/2  gets value (either from record or struct)
@@ -44,6 +47,10 @@ set_value(#embed{field=Field,key=undefined}, Val, Record) ->
     setelement(Field, Record, Val);
 set_value(#embed{field=undefined,key=Key}, Val, Struct) ->
     maps:put(Key, Val, Struct);
+set_value(#link{field=F,key=K}, Val, To) ->
+    set_value({F,K}, Val, To);
+set_value({Field,undefined}, Val, Record) -> set_value(Field, Val, Record);
+set_value({undefined,Key}, Val, Struct) -> set_value(Key, Val, Struct);
 set_value(Field, Val, Record) when is_integer(Field) andalso is_tuple(Record) ->
     setelement(Field, Record, Val);
 set_value(Key, Val, Struct) when is_atom(Key) andalso is_map(Struct) ->
@@ -64,7 +71,7 @@ undefined_value(K) when is_atom(K) -> nil.
 
 
 %% @doc Convert Erlang record tuple or Elixir struct to an XTDB document map using mapping
--spec to_doc(tuple() | map(), #mapping{}) -> #{atom() => any()}.
+-spec to_doc(rec_or_struct(), #mapping{}) -> #{atom() => any()}.
 to_doc(Record, #mapping{fields = Fields}) ->
     lists:foldl(
       fun(#field{attr=Name,to_xtdb=Conv,required=Req}=F, Doc) ->
@@ -104,6 +111,14 @@ to_rec(Doc, #mapping{empty = Empty, fields = Fields}) ->
 
                   %% Embedded had some values
                   Val -> set_value(Embed, Val, Rec)
+              end;
+         (#link{to=To, attr = Attr}=Link, Rec) ->
+              LinkMapping = xt_mapping:get(To),
+              case maps:get(Attr, Doc, undefined) of
+                  undefined -> Rec;
+                  [Vals] -> set_value(Link, [to_rec(V, LinkMapping)
+                                             || V <- Vals], Rec);
+                  Val -> set_value(Link, to_rec(Val, LinkMapping), Rec)
               end;
          (#static{}, Rec) -> Rec
 
@@ -204,6 +219,7 @@ mapping(EmptyRecordValue, FieldMappings) ->
     #mapping{empty = EmptyRecordValue,
              fields = FieldMappings}.
 
+
 %% @doc Create a field mapping that embeds another records information in the same document.
 %% This is convenient to not need shredding the documents, simply use the same document for
 %% all attributes. You can optionally specify prefix to apply for the embedded fields (for
@@ -213,8 +229,8 @@ mapping(EmptyRecordValue, FieldMappings) ->
 %% that maps ':address/postal-code' and so on and we embed two records with shipping- and billing-
 %% prefixes, we will get ':shipping-address/postal-code' and ':billing-address/postal-code' attributes
 %% in the document.
--spec embed(#mapping{}, integer() | atom()) -> #embed{}.
--spec embed(atom(), #mapping{}, integer() | atom()) -> #embed{}.
+-spec embed(#mapping{}, field_ref()) -> #embed{}.
+-spec embed(atom(), #mapping{}, field_ref()) -> #embed{}.
 embed(Mapping, FieldOrKey) ->
     {Field,Key} = case FieldOrKey of
                       F when is_integer(F) -> {F, undefined};
@@ -225,6 +241,22 @@ embed(Prefix, #mapping{fields=Fields}=Mapping, FieldOrKey) ->
     embed(Mapping#mapping{
             fields =
                 [ prefix_name(Prefix,F) || F <- Fields ]}, FieldOrKey).
+
+%% @doc Create a field mapping that links to another document or documents
+-spec link(atom(), rec_or_struct(), field_ref(), many | one) -> #link{}.
+link(Attr, To, FieldOrKey, Cardinality) ->
+    link(Attr, To,FieldOrKey, Cardinality, false).
+link(Attr, To, FieldOrKey, Cardinality, Owned) ->
+    {Field,Key} = case FieldOrKey of
+                      F when is_integer(F) -> {F,undefined};
+                      K when is_atom(K) -> {undefined, K}
+                  end,
+    #link{attr = Attr,
+          to = To,
+          field = Field, key = Key,
+          owned = Owned,
+          cardinality = Cardinality}.
+
 
 prefix_name(Prefix,#field{attr=Attr}=F) ->
     PrefixStr = atom_to_list(Prefix),
@@ -256,7 +288,9 @@ attributes(#mapping{fields = Fields}) ->
 attributes(#field{attr=A}, Acc) -> [A | Acc];
 attributes(#conversion{attrs=Attrs}, Acc) -> Attrs ++ Acc;
 attributes(#embed{mapping=M}, Acc) -> attributes(M) ++ Acc;
-attributes(#static{}, Acc) -> Acc.
+attributes(#static{}, Acc) -> Acc;
+attributes(#link{attr=Attr,to=To}, Acc) ->
+    [#{Attr => attributes(xt_mapping:get(To))} | Acc].
 
 next_param(In) ->
     list_to_atom( "p" ++ integer_to_list(length(In)) ).

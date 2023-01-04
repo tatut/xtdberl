@@ -3,18 +3,24 @@
 
 %% Demo how to use XTDB from Erlang, with mapping Erlang records to XTDB documents
 
--record(address, {street :: string(),
-                  city :: string(),
-                  zip :: string(),
-                  country :: string()}).
+-record(address, {street :: binary(),
+                  city :: binary(),
+                  zip :: binary(),
+                  country :: binary()}).
 
--record(person, {person_id :: string(),
-                 first_name :: string(),
-                 last_name :: string(),
-                 email :: string(),
+-record(person, {person_id :: binary(),
+                 first_name :: binary(),
+                 last_name :: binary(),
+                 email :: binary(),
                  date_of_birth :: calendar:date(),
                  shipping_address :: #address{},
-                 billing_address :: #address{}}).
+                 billing_address :: #address{},
+                 company :: tuple()}).
+
+-record(company, {id_code :: binary(),
+                  name :: binary(),
+                  visiting_address :: #address{},
+                  ceo :: #person{}}).
 
 -define(M, xt_mapping).
 register_mappings() ->
@@ -35,9 +41,18 @@ register_mappings() ->
            ?M:field(':person/email', #person.email),
            ?M:local_date(':person/date-of-birth', #person.date_of_birth),
            ?M:embed('shipping-', Addr, #person.shipping_address),
-           ?M:embed('billing-', Addr, #person.billing_address)]),
+           ?M:embed('billing-', Addr, #person.billing_address),
+           ?M:link(':person/company', #company{}, #person.company, one)]),
+    Company =
+        ?M:mapping(
+           #company{},
+           [?M:idmap(#company.id_code, ':company'),
+            ?M:required(?M:field(':company/name', #company.name)),
+            ?M:embed('visiting-', Addr, #company.visiting_address)]),
+
     ?M:register(Addr),
-    ?M:register(Person).
+    ?M:register(Person),
+    ?M:register(Company).
 
 
 person(Id,Fn,Ln,Email,Dob,Billing,Shipping) ->
