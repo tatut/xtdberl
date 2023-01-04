@@ -109,3 +109,18 @@ batch() ->
                              first_name="Batch245",
                              last_name="Second batch"})
       end).
+
+listen() ->
+    Pid = spawn(?MODULE, query_listen, []),
+    xt:ql(#person{first_name={textsearch,"M*"}}, [{defer, Pid}, {listen,yes}]),
+
+    Pid.
+
+query_listen() ->
+    receive
+        {ok, _, Results} ->
+            io:format("GOT RESULTS: ~p", [Results]),
+            query_listen();
+        stop ->
+            io:format("Stopping listening.", [])
+    end.

@@ -193,14 +193,13 @@ q(QueryAndOptions0) ->
         {defer, DeferToPid} ->
             spawn(fun() ->
                           pid() ! {q, self(), QueryId, Opts, Query, Args},
-                          receive
-                              {ok, QueryId, Results} ->
-                                  DeferToPid ! {ok, QueryId, ReadResults(Results)};
-                              {error, QueryId, ErrorInfo} ->
-                                  DeferToPid ! {error, QueryId, ErrorInfo}
-                          after 30000 ->
-                                  DeferToPid ! {timeout, QueryId}
-                          end
+                          Listen = lists:keymember(listen, 1, QueryAndOptions),
+
+                          %% Link the process that wants to receive results and trap exit
+                          link(DeferToPid),
+                          process_flag(trap_exit, true),
+
+                          defer_loop(DeferToPid, QueryId, ReadResults, Listen)
                   end),
             {deferred, QueryId};
 
@@ -217,6 +216,22 @@ q(QueryAndOptions0) ->
             end
     end.
 
+defer_loop(Pid, QueryId, ReadResults, Listen) ->
+    receive
+        {ok, QueryId, Results} ->
+            Pid ! {ok, QueryId, ReadResults(Results)},
+            case Listen of
+                false -> done;
+                true -> defer_loop(Pid, QueryId, ReadResults, Listen)
+            end;
+        {error, QueryId, ErrorInfo} ->
+            Pid ! {error, QueryId, ErrorInfo};
+
+        %% Listener process has exited, we can stop as well.
+        %% The listener mbox on the XTDB node will be notified.
+        {'EXIT', Pid, Why} ->
+            logger:debug("Listening PID ~p has exited: ~p", [Pid, Why])
+    end.
 
 
 -spec put(doclike() | [doclike()]) -> {ok, #txinfo{}} | {error, any()}.
