@@ -163,7 +163,14 @@ Later the query results are sent to the given pid as a tuple of:
 * `{error, QueryId, ErrorInfo}` when query fails
 * `{timeout, QueryId}` if query didn't respond within the timeout
 
+Asynchronous queries can also be used to listen for changes.
+Adding the `{listen, yes}` option to a deferred query will add
+a transaction listener on the database. Whenever new transactions
+are indexed, the query will be re-run and results sent to the same
+process. When the process exits for any reason, the listener is removed.
 
+Note: the listen parameter will in the future support patterns that
+conditionally re-run queries if the pattern matches a transaction operation.
 
 ## Time travel
 
