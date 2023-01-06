@@ -1,13 +1,14 @@
 {:paths ["src" "classes" "resources"]
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}
         org.clojure/tools.logging {:mvn/version "1.2.4"}
-        ;; Provide your own built jinterface lib, for now
+
+        ;; If you need to build jinterface, download Erlang/OTP source
         ;; Build it by running:
         ;; $ make jinterface
         ;;
         ;; in the Erlang/OTP src directory, the file will be in
         ;; lib/jinterface/priv directory.
-        com.ericsson.otp/otp-erlang {:local/root "./OtpErlang.jar"}
+        com.ericsson.otp/otp-erlang {:local/root "./lib/OtpErlang.jar"}
 
         com.xtdb/xtdb-core {:mvn/version "1.22.1"}
         com.xtdb/xtdb-lucene {:mvn/version "1.22.1"}}
