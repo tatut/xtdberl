@@ -26,35 +26,37 @@ conv(Fun, Val) ->  Fun(Val).
 -type field_ref() :: integer() | atom().
 
 %% Abstract over Erlang record and Elixir struct differences:
+%% - field_ref/1  returns a field_ref (tuple integer position or map atom key)
 %% - get_value/2  gets value (either from record or struct)
 %% - set_value/3  sets value into record tuple or struct map
 %% - undefined_value/1  determines wether to use undefined/nil as the "missing" value
 
-get_value(#field{field=Field,key=undefined}, Record) -> element(Field, Record);
-get_value(#field{field=undefined,key=Key}, Struct) -> maps:get(Key, Struct);
-get_value(#embed{field=Field,key=undefined}, Record) -> element(Field, Record);
-get_value(#embed{field=undefined,key=Key}, Struct) -> maps:get(Key, Struct);
+-spec field_ref(any()) -> field_ref().
+field_ref(#field{field=Field,key=undefined}) -> Field;
+field_ref(#field{key=Key}) -> Key;
+field_ref(#embed{field=Field,key=undefined}) -> Field;
+field_ref(#embed{key=Key}) -> Key;
+field_ref(#link{field=Field,key=undefined}) -> Field;
+field_ref(#link{key=Key}) -> Key;
+field_ref(F) when is_integer(F) -> F;
+field_ref(K) when is_atom(K) -> K;
+field_ref(Unknown) -> {unsupported_field_ref, Unknown}.
+
 get_value(Field, Record) when is_integer(Field) andalso is_tuple(Record) ->
     element(Field, Record);
 get_value(Key, Struct) when is_atom(Key) andalso is_map(Struct) ->
-    maps:get(Key, Struct).
+    maps:get(Key, Struct);
+get_value(Mapping, RecordOrStruct) ->
+    get_value(field_ref(Mapping), RecordOrStruct).
 
-set_value(#field{field=Field,key=undefined}, Val, Record) ->
-    setelement(Field, Record, Val);
-set_value(#field{field=undefined,key=Key}, Val, Struct) ->
-    maps:put(Key, Val, Struct);
-set_value(#embed{field=Field,key=undefined}, Val, Record) ->
-    setelement(Field, Record, Val);
-set_value(#embed{field=undefined,key=Key}, Val, Struct) ->
-    maps:put(Key, Val, Struct);
-set_value(#link{field=F,key=K}, Val, To) ->
-    set_value({F,K}, Val, To);
-set_value({Field,undefined}, Val, Record) -> set_value(Field, Val, Record);
-set_value({undefined,Key}, Val, Struct) -> set_value(Key, Val, Struct);
+
 set_value(Field, Val, Record) when is_integer(Field) andalso is_tuple(Record) ->
     setelement(Field, Record, Val);
 set_value(Key, Val, Struct) when is_atom(Key) andalso is_map(Struct) ->
-    maps:put(Key, Val, Struct).
+    maps:put(Key, Val, Struct);
+set_value(Mapping, Val, RecordOrStruct) ->
+    set_value(field_ref(Mapping), Val, RecordOrStruct).
+
 
 %% Get undefined value, Erlang uses undefined atom in records
 %% and Elixir structs have nil atom
@@ -182,6 +184,7 @@ local_date(Attr, FieldOrKey) ->
              ({Year,Month,Day}) -> {local_date, Year, Month, Day}
           end,
           fun(undefined) -> Undef;
+             (nil) -> Undef;
              ({local_date, Year, Month, Day}) -> {Year, Month, Day}
           end).
 
@@ -193,6 +196,7 @@ local_datetime(Attr,FieldOrKey) ->
              ({{Year,Month,Day},{Hour,Minute,Second}}) -> {local_datetime, Year,Month,Day,Hour,Minute,Second}
           end,
           fun(undefined) -> Undef;
+             (nil) -> Undef;
              ({local_datetime, Y, M, D, H, Mi, S})  ->
                   {{Y,M,D}, {H,Mi,S}}
           end).
@@ -410,9 +414,10 @@ qlike(Candidate, Mapping, OptionList) ->
             true -> add_order(Mapping, Find0, Where0, Options1);
             false -> {Find0, Where0, Options1}
         end,
+    Options3 = orddict:erase(fetch, Options2),
     lists:foldl(fun({Key, Value}, Opts) ->
                         orddict:store(Key, Value, Opts) end,
-                Options2,
+                Options3,
                 [{find, Find},
                  {where, Where},
                  {in, In}]).
@@ -447,16 +452,14 @@ read_results(Results, Mapping) ->
     [to_rec(hd(R), Mapping) || R <- Results].
 
 mapping_for(Mapping, Field) ->
-    case lists:search(fun(#field{field=F1}) when F1 == Field -> true;
-                         (#embed{field=F1}) when F1 == Field -> true;
-                         (_) -> false end,
+    case lists:search(fun(M) -> field_ref(M) == Field end,
                       Mapping#mapping.fields) of
         {value, Fm} -> Fm;
         false -> throw({no_field_mapping_for, Field, in, Mapping})
     end.
 
 fetch(_, [], Acc) -> Acc;
-fetch(M, [F|Fields], Acc) when is_integer(F) ->
+fetch(M, [F|Fields], Acc) when is_integer(F) orelse is_atom(F) ->
     #field{attr=Attr} = mapping_for(M, F),
     fetch(M, Fields, [Attr | Acc]);
 fetch(M, [{Embed,EmbedFields}|Fields], Acc) ->
