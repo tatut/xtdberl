@@ -180,7 +180,7 @@ field(Attr, FieldOrKey, ToXTDB, FromXTDB) ->
 local_date(Attr, FieldOrKey) ->
     Undef = undefined_value(FieldOrKey),
     field(Attr, FieldOrKey,
-          fun(U) when U == Undef -> undefined;
+          fun(U) when U == Undef -> U;
              ({Year,Month,Day}) -> {local_date, Year, Month, Day}
           end,
           fun(undefined) -> Undef;
@@ -422,12 +422,6 @@ qlike(Candidate, Mapping, OptionList) ->
                  {where, Where},
                  {in, In}]).
 
-find_attr(#mapping{fields=Fields}, Field) ->
-    find_attr(Fields, Field);
-find_attr([#field{field = Field, attr = Attr}|_], Field) -> Attr;
-find_attr([_|Fields], Field) -> find_attr(Fields, Field);
-find_attr(_, Field) -> throw({no_attr_for_field, Field}).
-
 %% FIXME: support embedded records in where
 add_order(Mapping, Find0, Where0, Options) ->
     Order0 = orddict:fetch(order_by, Options),
@@ -437,8 +431,16 @@ add_order(Mapping, Find0, Where0, Options) ->
           fun(I, {Find, Where, Order}) ->
                   {Field, Dir} = lists:nth(I, Order0),
                   Name = list_to_atom("_o"++integer_to_list(I)),
+
+                  AttrName = case mapping_for(Mapping, Field) of
+                                 #field{attr=Attr} -> Attr;
+                                 Else -> throw({unsupported_order_by, Else})
+                             end,
+
                   {Find ++ [Name],
-                   Where ++ [[qlike, find_attr(Mapping, Field), Name]],
+                   %% should use get-attr if missing value?
+                   %% or always store nils ?
+                   Where ++ [[qlike, AttrName, Name]],
                    Order ++ [[Name, case Dir of
                                         asc -> ':asc';
                                         desc -> ':desc' end]]}
