@@ -14,7 +14,8 @@
 
          %% Support for querying by records
          attributes/1,
-         qlike/3, read_results/2]).
+         qlike/3, qlike_count/3,
+         read_results/2]).
 -include("xt_mapping.hrl").
 
 %% Maybe run value through conversion function
@@ -421,6 +422,10 @@ qlike(Candidate, Mapping, OptionList) ->
                 [{find, Find},
                  {where, Where},
                  {in, In}]).
+
+qlike_count(Candidate, Mapping, OptionList) ->
+    [{find,_} | Options] = qlike(Candidate, Mapping, OptionList),
+    [{find,[[count, qlike]]}] ++ Options.
 
 %% FIXME: support embedded records in where
 add_order(Mapping, Find0, Where0, Options) ->

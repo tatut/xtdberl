@@ -2,7 +2,7 @@
 -module(xt).
 -export([start_link/1, stop/1, init/1, monitor_xtdb/2,
          register_xtdb_node/1,
-         q/1, put/1, status/0, ql/1, ql/2,
+         q/1, put/1, status/0, ql/1, ql/2, qlcount/1, qlcount/2,
          batch/1, batch_handler/2
         ]).
 -include("types.hrl").
@@ -275,6 +275,12 @@ status() ->
     after 5000 -> timeout
     end.
 
+get_mapping(Candidate, Options) ->
+    case lists:keyfind(mapping, 1, Options) of
+        false -> xt_mapping:get(Candidate);
+        {mapping, M} -> M
+    end.
+
 %% @doc Query Like record instances.
 %% Takes a candidate instance and creates a query to find similar instances.
 %% Requires that a record mapping is registered beforehand.
@@ -291,13 +297,17 @@ ql(Candidate) when is_tuple(Candidate) orelse is_map(Candidate) ->
 %% </dl>
 %% @see xt_mapping:qlike/2.
 ql(Candidate,Options) when is_tuple(Candidate) orelse is_map(Candidate) ->
-    Mapping = case lists:keyfind(mapping, 1, Options) of
-                  false -> xt_mapping:get(Candidate);
-                  {mapping, M} -> M
-              end,
+    Mapping = get_mapping(Candidate, Options),
     q([{read_results,
         fun(R) -> xt_mapping:read_results(R,Mapping) end} |
        xt_mapping:qlike(Candidate, Mapping, Options)]).
+
+qlcount(Candidate) ->
+    qlcount(Candidate,[]).
+qlcount(Candidate, Options) ->
+    Mapping = get_mapping(Candidate, Options),
+    q([{read_results, fun([[C]]) -> C end} |
+       xt_mapping:qlike_count(Candidate, Mapping, Options)]).
 
 
 
