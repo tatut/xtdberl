@@ -12,6 +12,9 @@
          required/1, static/2,
          link/4, link/5,
 
+         %% Functions for querying mappings information
+         mapping_for/2,
+
          %% Support for querying by records
          attributes/1,
          qlike/3, qlike_count/3,
@@ -425,7 +428,7 @@ qlike(Candidate, Mapping, OptionList) ->
 
 qlike_count(Candidate, Mapping, OptionList) ->
     [{find,_} | Options] = qlike(Candidate, Mapping, OptionList),
-    [{find,[[count, qlike]]}] ++ Options.
+    [{find,[['count-distinct', qlike]]}] ++ Options.
 
 %% FIXME: support embedded records in where
 add_order(Mapping, Find0, Where0, Options) ->
