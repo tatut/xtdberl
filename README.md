@@ -1,6 +1,8 @@
 xtdberl
 =====
 
+ARCHIVE NOTE: No plans to continue development as this is for XTDB v1.
+
 *** ALPHA status, don't use this yet! ***
 
 
